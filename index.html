@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>外食株主優待ノート</title>
+  <!-- Supabase JS Client (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --primary: #ff6b4a;
+      --primary-light: #fff0ed;
+      --bg: #f8f9fa;
+      --card-bg: #ffffff;
+      --text: #2d3748;
+      --text-sub: #718096;
+      --border: #edf2f7;
+      --alert-red: #e53e3e;
+      --alert-yellow: #dd6b20;
+      --badge-home: #718096;
+      --badge-husband: #3182ce;
+      --badge-wife: #d53f8c;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 16px 12px 80px;
+    }
+
+    .app-container {
+      width: 100%;
+      max-width: 440px;
+    }
+
+    /* ヘッダー */
+    header {
+      margin-bottom: 16px;
+    }
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+    .sync-status {
+      font-size: 0.75rem;
+      color: #38a169;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .sync-dot {
+      width: 8px;
+      height: 8px;
+      background: #38a169;
+      border-radius: 50%;
+    }
+
+    /* カレンダーエリア */
+    .calendar-card {
+      background: var(--card-bg);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      border: 1px solid var(--border);
+      margin-bottom: 20px;
+    }
+    .calendar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .calendar-nav-btn {
+      background: none;
+      border: none;
+      font-size: 1.1rem;
+      cursor: pointer;
+      padding: 4px 8px;
+      color: var(--text-sub);
+    }
+    .current-month-label {
+      font-weight: 700;
+      font-size: 1rem;
+    }
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+      text-align: center;
+    }
+    .weekday-header {
+      font-size: 0.75rem;
+      color: var(--text-sub);
+      padding-bottom: 4px;
+      font-weight: 600;
+    }
+    .weekday-header:first-child { color: var(--alert-red); }
+    .weekday-header:last-child { color: var(--badge-husband); }
+
+    .calendar-cell {
+      aspect-ratio: 1;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding-top: 4px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: background 0.15s ease;
+    }
+    .calendar-cell:hover { background-color: var(--primary-light); }
+    .calendar-cell.empty { cursor: default; background: transparent !important; }
+    .calendar-cell.has-item { font-weight: 700; }
+    .calendar-cell.is-selected {
+      border-color: var(--primary);
+      background-color: var(--primary-light);
+    }
+    .item-dots {
+      display: flex;
+      gap: 1px;
+      margin-top: 2px;
+      font-size: 0.65rem;
+      line-height: 1;
+    }
+
+    /* 一覧セクション */
+    .list-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      padding: 0 4px;
+    }
+    .list-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+    }
+    .filter-reset-btn {
+      font-size: 0.75rem;
+      color: var(--primary);
+      background: none;
+      border: none;
+      cursor: pointer;
+      display: none;
+    }
+    .yutai-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* 優待カード */
+    .yutai-card {
+      background: var(--card-bg);
+      border-radius: 14px;
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .yutai-card.highlight {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px var(--primary-light);
+    }
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .brand-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .genre-icon {
+      font-size: 1.5rem;
+      line-height: 1;
+    }
+    .brand-name {
+      font-weight: 700;
+      font-size: 1rem;
+    }
+    .wallet-badge {
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+      color: #fff;
+    }
+    .badge-妻の財布 { background-color: var(--badge-wife); }
+    .badge-夫の財布 { background-color: var(--badge-husband); }
+    .badge-自宅 { background-color: var(--badge-home); }
+
+    .card-mid {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      min-height: 38px;
+    }
+    .balance-wrapper {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+      cursor: pointer;
+      padding: 4px 8px;
+      margin: -4px -8px;
+      border-radius: 6px;
+      transition: background 0.15s ease;
+    }
+    .balance-wrapper:hover { background: var(--bg); }
+    .balance-info {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .edit-hint {
+      font-size: 0.75rem;
+      color: var(--text-sub);
+      opacity: 0.6;
+    }
+    .balance-wrapper small {
+      font-size: 0.75rem;
+      color: var(--text-sub);
+    }
+
+    .edit-inline-form {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .edit-input {
+      font-size: 1rem;
+      font-weight: 700;
+      padding: 4px 8px;
+      width: 100px;
+      border: 2px solid var(--primary);
+      border-radius: 6px;
+      outline: none;
+    }
+    .edit-save-btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .expire-badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+    }
+    .expire-soon { background: #ffe3e3; color: var(--alert-red); }
+    .expire-warn { background: #fff3c4; color: var(--alert-yellow); }
+    .expire-normal { background: #edf2f7; color: var(--text-sub); }
+
+    .card-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px dashed var(--border);
+      padding-top: 8px;
+      margin-top: 2px;
+    }
+    .expire-date-text {
+      font-size: 0.75rem;
+      color: var(--text-sub);
+    }
+    .action-btns {
+      display: flex;
+      gap: 6px;
+    }
+    .use-btn {
+      background: #f7fafc;
+      border: 1px solid #cbd5e0;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .use-btn:active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    /* フローティングボタン */
+    .fab {
+      position: fixed;
+      bottom: 24px;
+      right: 20px;
+      background: var(--primary);
+      color: white;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      box-shadow: 0 4px 14px rgba(255, 107, 74, 0.4);
+      cursor: pointer;
+      border: none;
+    }
+
+    /* 登録モーダル */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.4);
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    .modal-overlay.is-open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .modal-content {
+      background: #fff;
+      width: 100%;
+      max-width: 440px;
+      border-radius: 20px 20px 0 0;
+      padding: 20px 20px 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      transform: translateY(100%);
+      transition: transform 0.25s ease;
+    }
+    .modal-overlay.is-open .modal-content {
+      transform: translateY(0);
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .form-group label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-sub);
+    }
+    .form-input, .form-select {
+      padding: 10px 12px;
+      border: 1px solid #cbd5e0;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      outline: none;
+    }
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .submit-btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 6px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-container">
+    <header>
+      <div class="header-top">
+        <h1>🍽️ 外食優待ノート</h1>
+        <div class="sync-status"><span class="sync-dot"></span> 夫婦共有中</div>
+      </div>
+    </header>
+
+    <section class="calendar-card">
+      <div class="calendar-header">
+        <button class="calendar-nav-btn" id="prev-month">&lt;</button>
+        <div class="current-month-label" id="month-label"></div>
+        <button class="calendar-nav-btn" id="next-month">&gt;</button>
+      </div>
+      <div class="calendar-grid" id="calendar-grid">
+        <div class="weekday-header">日</div>
+        <div class="weekday-header">月</div>
+        <div class="weekday-header">火</div>
+        <div class="weekday-header">水</div>
+        <div class="weekday-header">木</div>
+        <div class="weekday-header">金</div>
+        <div class="weekday-header">土</div>
+      </div>
+    </section>
+
+    <section>
+      <div class="list-header">
+        <div class="list-title" id="list-title">有効期限が近い順</div>
+        <button class="filter-reset-btn" id="reset-filter" onclick="resetFilter()">すべて表示</button>
+      </div>
+      <div class="yutai-list" id="yutai-list"></div>
+    </section>
+
+    <button class="fab" onclick="openModal()">＋</button>
+  </div>
+
+  <!-- 新規登録モーダル -->
+  <div class="modal-overlay" id="modal-overlay" onclick="closeModalOnBackdrop(event)">
+    <div class="modal-content">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <strong style="font-size:1.1rem;">新しい優待を登録</strong>
+        <span onclick="closeModal()" style="font-size:1.5rem; cursor:pointer;">&times;</span>
+      </div>
+      <div class="form-group">
+        <label>銘柄名・店名</label>
+        <input type="text" id="m-name" class="form-input" placeholder="例: すかいらーく" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>アイコン</label>
+          <select id="m-icon" class="form-select">
+            <option value="🍕">🍕 ピザ・ファミレス</option>
+            <option value="🍣">🍣 寿司</option>
+            <option value="🥩">🥩 焼肉・肉</option>
+            <option value="☕️">☕️ カフェ・軽食</option>
+            <option value="🍚">🍚 定食・丼</option>
+            <option value="🍺">🍺 居酒屋</option>
+            <option value="🍽️">🍽️ その他</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>タイプ</label>
+          <select id="m-is-point" class="form-select">
+            <option value="false">500円等の紙券</option>
+            <option value="true">1円単位ポイント</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>残高（合計金額）</label>
+          <input type="number" id="m-amount" class="form-input" placeholder="3000" inputmode="numeric" />
+        </div>
+        <div class="form-group">
+          <label>券面額 (紙券のみ)</label>
+          <input type="number" id="m-unit" class="form-input" value="500" inputmode="numeric" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>有効期限</label>
+          <input type="date" id="m-limit-date" class="form-input" />
+        </div>
+        <div class="form-group">
+          <label>保管場所</label>
+          <select id="m-holder" class="form-select">
+            <option value="妻の財布">妻の財布</option>
+            <option value="夫の財布">夫の財布</option>
+            <option value="自宅">自宅</option>
+          </select>
+        </div>
+      </div>
+      <button class="submit-btn" onclick="saveNewCoupon()">Supabaseに保存</button>
+    </div>
+  </div>
+
+  <script>
+    // ----------------------------------------------------
+    // 1. Supabase 初期設定
+    // ----------------------------------------------------
+    const SUPABASE_URL = 'YOUR_SUPABASE_URL'; // https://xxxx.supabase.co
+    const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY'; // eyJ...
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // 状態管理
+    let coupons = [];
+    let editingCouponId = null;
+    let currentYear = 2026;
+    let currentMonth = 8; // 9月 (0始まり)
+    let selectedDateStr = null;
+
+    // ----------------------------------------------------
+    // 2. Supabase 連携ロジック (読み込み・同期・書き込み)
+    // ----------------------------------------------------
+    async function fetchCoupons() {
+      const { data, error } = await supabase
+        .from('coupons')
+        .select('*')
+        .order('limit_date', { ascending: true });
+
+      if (error) {
+        console.error('取得エラー:', error);
+        return;
+      }
+      coupons = data || [];
+      renderCalendar();
+      renderList(selectedDateStr);
+    }
+
+    // リアルタイム同期の購読設定
+    function setupRealtime() {
+      supabase
+        .channel('public:coupons')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'coupons' }, () => {
+          fetchCoupons(); // 誰かが変更したら再読み込み
+        })
+        .subscribe();
+    }
+
+    // 残高の更新
+    async function updateAmountInDB(id, newAmount) {
+      const { error } = await supabase
+        .from('coupons')
+        .update({ amount: newAmount })
+        .eq('id', id);
+
+      if (error) alert('更新に失敗しました: ' + error.message);
+    }
+
+    // 新規優待の登録
+    async function saveNewCoupon() {
+      const name = document.getElementById('m-name').value;
+      const icon = document.getElementById('m-icon').value;
+      const isPoint = document.getElementById('m-is-point').value === 'true';
+      const amount = parseInt(document.getElementById('m-amount').value, 10);
+      const unit = parseInt(document.getElementById('m-unit').value, 10) || 500;
+      const limitDate = document.getElementById('m-limit-date').value;
+      const holder = document.getElementById('m-holder').value;
+
+      if (!name || isNaN(amount) || !limitDate) {
+        alert('銘柄名、金額、期限は必須です');
+        return;
+      }
+
+      const { error } = await supabase.from('coupons').insert([{
+        name,
+        icon,
+        is_point: isPoint,
+        amount,
+        unit,
+        limit_date: limitDate,
+        holder
+      }]);
+
+      if (error) {
+        alert('保存エラー: ' + error.message);
+      } else {
+        closeModal();
+        fetchCoupons();
+      }
+    }
+
+    // ----------------------------------------------------
+    // 3. UI 描画ロジック
+    // ----------------------------------------------------
+    function renderCalendar() {
+      const grid = document.getElementById('calendar-grid');
+      const label = document.getElementById('month-label');
+      label.textContent = `${currentYear}年 ${currentMonth + 1}月`;
+
+      while (grid.children.length > 7) {
+        grid.removeChild(grid.lastChild);
+      }
+
+      const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+      const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+
+      for (let i = 0; i < firstDay; i++) {
+        const empty = document.createElement('div');
+        empty.className = 'calendar-cell empty';
+        grid.appendChild(empty);
+      }
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const cell = document.createElement('div');
+        cell.className = 'calendar-cell';
+        const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const matching = coupons.filter(c => c.limit_date === dateStr);
+
+        cell.innerHTML = `<span>${day}</span>`;
+
+        if (matching.length > 0) {
+          cell.classList.add('has-item');
+          const dots = document.createElement('div');
+          dots.className = 'item-dots';
+          dots.innerHTML = matching.map(c => c.icon).join('');
+          cell.appendChild(dots);
+        }
+
+        if (selectedDateStr === dateStr) cell.classList.add('is-selected');
+
+        cell.onclick = () => {
+          if (matching.length > 0) {
+            selectedDateStr = dateStr;
+            renderCalendar();
+            renderList(dateStr);
+          } else {
+            resetFilter();
+          }
+        };
+
+        grid.appendChild(cell);
+      }
+    }
+
+    function renderList(filterDate = null) {
+      const list = document.getElementById('yutai-list');
+      const title = document.getElementById('list-title');
+      const resetBtn = document.getElementById('reset-filter');
+      list.innerHTML = '';
+
+      let display = [...coupons];
+      if (filterDate) {
+        display = display.filter(c => c.limit_date === filterDate);
+        title.textContent = `${filterDate} 期限 (${display.length}件)`;
+        resetBtn.style.display = 'block';
+      } else {
+        title.textContent = '有効期限が近い順';
+        resetBtn.style.display = 'none';
+        display.sort((a, b) => new Date(a.limit_date) - new Date(b.limit_date));
+      }
+
+      const today = new Date();
+
+      display.forEach(item => {
+        const diffDays = Math.ceil((new Date(item.limit_date) - today) / (1000 * 60 * 60 * 24));
+        let badgeClass = diffDays <= 7 ? 'expire-soon' : (diffDays <= 30 ? 'expire-warn' : 'expire-normal');
+        let badgeText = diffDays < 0 ? '期限切れ' : `あと${diffDays}日`;
+
+        const isEditing = (editingCouponId === item.id);
+        const card = document.createElement('div');
+        card.className = `yutai-card ${filterDate ? 'highlight' : ''}`;
+
+        const subLabel = item.is_point 
+          ? `<small>(1円単位pt)</small>` 
+          : `<small>(${item.unit}円券 × ${Math.floor(item.amount / item.unit)}枚)</small>`;
+
+        card.innerHTML = `
+          <div class="card-top">
+            <div class="brand-info">
+              <span class="genre-icon">${item.icon}</span>
+              <span class="brand-name">${item.name}</span>
+            </div>
+            <span class="wallet-badge badge-${item.holder}">${item.holder}</span>
+          </div>
+          <div class="card-mid">
+            ${isEditing ? `
+              <div class="edit-inline-form">
+                ¥<input type="number" class="edit-input" id="input-${item.id}" value="${item.amount}" inputmode="numeric" />
+                <button class="edit-save-btn" onclick="saveDirectBalance(${item.id})">保存</button>
+              </div>
+            ` : `
+              <div class="balance-wrapper" onclick="startEditing(${item.id})">
+                <div class="balance-info">
+                  ¥${item.amount.toLocaleString()}
+                  <span class="edit-hint">✎</span>
+                </div>
+                ${subLabel}
+              </div>
+            `}
+            <span class="expire-badge ${badgeClass}">${badgeText}</span>
+          </div>
+          <div class="card-bottom">
+            <span class="expire-date-text">期限: ${item.limit_date}</span>
+            <div class="action-btns">
+              ${!item.is_point ? `<button class="use-btn" onclick="useCoupon(${item.id})">−¥${item.unit}</button>` : ''}
+              <button class="use-btn" onclick="startEditing(${item.id})">残高上書き</button>
+            </div>
+          </div>
+        `;
+        list.appendChild(card);
+
+        if (isEditing) {
+          const inputEl = document.getElementById(`input-${item.id}`);
+          if (inputEl) {
+            inputEl.focus();
+            inputEl.select();
+            inputEl.addEventListener('keydown', (e) => {
+              if (e.key === 'Enter') saveDirectBalance(item.id);
+            });
+          }
+        }
+      });
+    }
+
+    function startEditing(id) {
+      editingCouponId = id;
+      renderList(selectedDateStr);
+    }
+
+    async function saveDirectBalance(id) {
+      const inputEl = document.getElementById(`input-${id}`);
+      if (!inputEl) return;
+      const newAmount = parseInt(inputEl.value, 10);
+      if (!isNaN(newAmount) && newAmount >= 0) {
+        await updateAmountInDB(id, newAmount);
+      }
+      editingCouponId = null;
+    }
+
+    async function useCoupon(id) {
+      const target = coupons.find(c => c.id === id);
+      if (target && target.amount >= target.unit) {
+        const nextAmount = target.amount - target.unit;
+        await updateAmountInDB(id, nextAmount);
+      }
+    }
+
+    function resetFilter() {
+      selectedDateStr = null;
+      renderCalendar();
+      renderList();
+    }
+
+    // モーダル操作
+    function openModal() {
+      document.getElementById('modal-overlay').classList.add('is-open');
+    }
+    function closeModal() {
+      document.getElementById('modal-overlay').classList.remove('is-open');
+    }
+    function closeModalOnBackdrop(e) {
+      if (e.target.id === 'modal-overlay') closeModal();
+    }
+
+    // カレンダー月送り
+    document.getElementById('prev-month').onclick = () => {
+      currentMonth--;
+      if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+      renderCalendar();
+    };
+    document.getElementById('next-month').onclick = () => {
+      currentMonth++;
+      if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+      renderCalendar();
+    };
+
+    // 初期化実行
+    fetchCoupons();
+    setupRealtime();
+  </script>
+</body>
+</html>
