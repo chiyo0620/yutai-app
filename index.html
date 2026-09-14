@@ -520,11 +520,10 @@
         .select('*')
         .order('limit_date', { ascending: true });
 
-      if (error) {
-        console.error('取得エラー:', error);
+if (error) {
+        alert('エラー原因: ' + error.message);
         return;
-      }
-      coupons = data || [];
+      }      coupons = data || [];
       renderCalendar();
       renderList(selectedDateStr);
     }
