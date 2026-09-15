@@ -6,397 +6,8 @@
   <title>外食株主優待ノート</title>
   <!-- Supabase JS Client (CDN) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <style>
-    :root {
-      --primary: #ff6b4a;
-      --primary-light: #fff0ed;
-      --bg: #f8f9fa;
-      --card-bg: #ffffff;
-      --text: #2d3748;
-      --text-sub: #718096;
-      --border: #edf2f7;
-      --alert-red: #e53e3e;
-      --alert-yellow: #dd6b20;
-      --badge-home: #718096;
-      --badge-husband: #3182ce;
-      --badge-wife: #d53f8c;
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    }
-
-    body {
-      background-color: var(--bg);
-      color: var(--text);
-      display: flex;
-      justify-content: center;
-      min-height: 100vh;
-      padding: 16px 12px 80px;
-    }
-
-    .app-container {
-      width: 100%;
-      max-width: 440px;
-    }
-
-    /* ヘッダー */
-    header {
-      margin-bottom: 16px;
-    }
-    .header-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 12px;
-    }
-    h1 {
-      font-size: 1.25rem;
-      font-weight: 700;
-    }
-    .sync-status {
-      font-size: 0.75rem;
-      color: #38a169;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-    .sync-dot {
-      width: 8px;
-      height: 8px;
-      background: #38a169;
-      border-radius: 50%;
-    }
-
-    /* カレンダーエリア */
-    .calendar-card {
-      background: var(--card-bg);
-      border-radius: 16px;
-      padding: 16px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-      border: 1px solid var(--border);
-      margin-bottom: 20px;
-    }
-    .calendar-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 12px;
-    }
-    .calendar-nav-btn {
-      background: none;
-      border: none;
-      font-size: 1.1rem;
-      cursor: pointer;
-      padding: 4px 8px;
-      color: var(--text-sub);
-    }
-    .current-month-label {
-      font-weight: 700;
-      font-size: 1rem;
-    }
-    .calendar-grid {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      gap: 4px;
-      text-align: center;
-    }
-    .weekday-header {
-      font-size: 0.75rem;
-      color: var(--text-sub);
-      padding-bottom: 4px;
-      font-weight: 600;
-    }
-    .weekday-header:first-child { color: var(--alert-red); }
-    .weekday-header:last-child { color: var(--badge-husband); }
-
-    .calendar-cell {
-      aspect-ratio: 1;
-      border-radius: 8px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
-      padding-top: 4px;
-      font-size: 0.8rem;
-      cursor: pointer;
-      border: 1px solid transparent;
-      transition: background 0.15s ease;
-    }
-    .calendar-cell:hover { background-color: var(--primary-light); }
-    .calendar-cell.empty { cursor: default; background: transparent !important; }
-    .calendar-cell.has-item { font-weight: 700; }
-    .calendar-cell.is-selected {
-      border-color: var(--primary);
-      background-color: var(--primary-light);
-    }
-    .item-dots {
-      display: flex;
-      gap: 1px;
-      margin-top: 2px;
-      font-size: 0.65rem;
-      line-height: 1;
-    }
-
-    /* 一覧セクション */
-    .list-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 12px;
-      padding: 0 4px;
-    }
-    .list-title {
-      font-size: 0.95rem;
-      font-weight: 700;
-    }
-    .filter-reset-btn {
-      font-size: 0.75rem;
-      color: var(--primary);
-      background: none;
-      border: none;
-      cursor: pointer;
-      display: none;
-    }
-    .yutai-list {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    /* 優待カード */
-    .yutai-card {
-      background: var(--card-bg);
-      border-radius: 14px;
-      padding: 14px 16px;
-      border: 1px solid var(--border);
-      box-shadow: 0 2px 6px rgba(0,0,0,0.03);
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .yutai-card.highlight {
-      border-color: var(--primary);
-      box-shadow: 0 0 0 2px var(--primary-light);
-    }
-    .card-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-    }
-    .brand-info {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .genre-icon {
-      font-size: 1.5rem;
-      line-height: 1;
-    }
-    .brand-name {
-      font-weight: 700;
-      font-size: 1rem;
-    }
-    .wallet-badge {
-      font-size: 0.7rem;
-      font-weight: 600;
-      padding: 2px 8px;
-      border-radius: 999px;
-      color: #fff;
-    }
-    .badge-妻の財布 { background-color: var(--badge-wife); }
-    .badge-夫の財布 { background-color: var(--badge-husband); }
-    .badge-自宅 { background-color: var(--badge-home); }
-
-    .card-mid {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      min-height: 38px;
-    }
-    .balance-wrapper {
-      display: flex;
-      align-items: baseline;
-      gap: 4px;
-      cursor: pointer;
-      padding: 4px 8px;
-      margin: -4px -8px;
-      border-radius: 6px;
-      transition: background 0.15s ease;
-    }
-    .balance-wrapper:hover { background: var(--bg); }
-    .balance-info {
-      font-size: 1.25rem;
-      font-weight: 800;
-      color: var(--text);
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-    .edit-hint {
-      font-size: 0.75rem;
-      color: var(--text-sub);
-      opacity: 0.6;
-    }
-    .balance-wrapper small {
-      font-size: 0.75rem;
-      color: var(--text-sub);
-    }
-
-    .edit-inline-form {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .edit-input {
-      font-size: 1rem;
-      font-weight: 700;
-      padding: 4px 8px;
-      width: 100px;
-      border: 2px solid var(--primary);
-      border-radius: 6px;
-      outline: none;
-    }
-    .edit-save-btn {
-      background: var(--primary);
-      color: white;
-      border: none;
-      border-radius: 6px;
-      padding: 6px 10px;
-      font-size: 0.75rem;
-      font-weight: 700;
-      cursor: pointer;
-    }
-
-    .expire-badge {
-      font-size: 0.75rem;
-      font-weight: 700;
-      padding: 3px 8px;
-      border-radius: 6px;
-    }
-    .expire-soon { background: #ffe3e3; color: var(--alert-red); }
-    .expire-warn { background: #fff3c4; color: var(--alert-yellow); }
-    .expire-normal { background: #edf2f7; color: var(--text-sub); }
-
-    .card-bottom {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-top: 1px dashed var(--border);
-      padding-top: 8px;
-      margin-top: 2px;
-    }
-    .expire-date-text {
-      font-size: 0.75rem;
-      color: var(--text-sub);
-    }
-    .action-btns {
-      display: flex;
-      gap: 6px;
-    }
-    .use-btn {
-      background: #f7fafc;
-      border: 1px solid #cbd5e0;
-      border-radius: 6px;
-      padding: 4px 10px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .use-btn:active {
-      background: var(--primary);
-      color: #fff;
-      border-color: var(--primary);
-    }
-
-    /* フローティングボタン */
-    .fab {
-      position: fixed;
-      bottom: 24px;
-      right: 20px;
-      background: var(--primary);
-      color: white;
-      width: 56px;
-      height: 56px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 2rem;
-      box-shadow: 0 4px 14px rgba(255, 107, 74, 0.4);
-      cursor: pointer;
-      border: none;
-    }
-
-    /* 登録モーダル */
-    .modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.4);
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
-      z-index: 100;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.2s ease;
-    }
-    .modal-overlay.is-open {
-      opacity: 1;
-      pointer-events: auto;
-    }
-    .modal-content {
-      background: #fff;
-      width: 100%;
-      max-width: 440px;
-      border-radius: 20px 20px 0 0;
-      padding: 20px 20px 32px;
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-      transform: translateY(100%);
-      transition: transform 0.25s ease;
-    }
-    .modal-overlay.is-open .modal-content {
-      transform: translateY(0);
-    }
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    .form-group label {
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: var(--text-sub);
-    }
-    .form-input, .form-select {
-      padding: 10px 12px;
-      border: 1px solid #cbd5e0;
-      border-radius: 8px;
-      font-size: 0.95rem;
-      outline: none;
-    }
-    .form-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-    .submit-btn {
-      background: var(--primary);
-      color: white;
-      border: none;
-      padding: 12px;
-      border-radius: 10px;
-      font-size: 1rem;
-      font-weight: 700;
-      cursor: pointer;
-      margin-top: 6px;
-    }
-  </style>
+  <!-- 外部CSSの読み込み -->
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
@@ -408,6 +19,19 @@
       </div>
     </header>
 
+    <!-- ★第1弾：浮いた外食費カード（タップで履歴表示、切替ボタンで今月/今年） -->
+    <section class="savings-card" onclick="handleSavingsCardClick(event)">
+      <div class="savings-left">
+        <div class="savings-title-wrap">
+          <span class="savings-title" id="savings-title">今年浮いた外食費（累計）</span>
+          <button class="savings-toggle-btn" id="savings-toggle-btn" onclick="toggleSavingsPeriod(event)">今月に切替</button>
+        </div>
+        <div class="savings-sub">タップして利用履歴を見る 📖</div>
+      </div>
+      <div class="savings-amount" id="savings-amount">¥0</div>
+    </section>
+
+    <!-- カレンダーエリア -->
     <section class="calendar-card">
       <div class="calendar-header">
         <button class="calendar-nav-btn" id="prev-month">&lt;</button>
@@ -425,6 +49,7 @@
       </div>
     </section>
 
+    <!-- 優待リスト -->
     <section>
       <div class="list-header">
         <div class="list-title" id="list-title">有効期限が近い順</div>
@@ -496,247 +121,34 @@
     </div>
   </div>
 
-  <script>
-const SUPABASE_URL = 'https://wfqgitxkhywzormlpite.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmcWdpdHhraHl3em9ybWxwaXRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkzODM2NTgsImV4cCI6MjEwNDk1OTY1OH0.Q-J6x26fZoIjiPOHfTABdJXVoVbG0tvOyFNU_DW1P_o';
-
-let supabaseClient;  // ← 名前を変える
-try {
-  if (!window.supabase) { // ※ここは window.supabase のまま！
-    throw new Error("Supabaseの通信部品が読み込めませんでした。");
-  }
-  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); // ← 名前を変える
-  } catch (e) {
-  alert("初期設定エラー: " + e.message);
-}
-
-let coupons = [];
-let editingCouponId = null;
-let currentYear = 2026;
-let currentMonth = 8;
-let selectedDateStr = null;
-
-async function fetchCoupons() {
-  if (!supabaseClient) {
-    renderCalendar();
-    renderList(selectedDateStr);
-    return;
-  }
-  try {
-    const { data, error } = await supabaseClient.from('coupons').select('*').order('limit_date', { ascending: true });
-    if (error) {
-      alert('Supabaseのエラー: ' + error.message);
-      return;
-    }
-    coupons = data || [];
-  } catch (err) {
-    alert('致命的な通信エラー: ' + err.message);
-  } finally {
-    renderCalendar();
-    renderList(selectedDateStr);
-  }
-}
-
-function setupRealtime() {
-  if (!supabaseClient) return;
-  supabaseClient.channel('public:coupons').on('postgres_changes', { event: '*', schema: 'public', table: 'coupons' }, () => {
-    fetchCoupons();
-  }).subscribe();
-}
-
-async function updateAmountInDB(id, newAmount) {
-  if (!supabaseClient) return;
-  const { error } = await supabaseClient.from('coupons').update({ amount: newAmount }).eq('id', id);
-  if (error) alert('更新に失敗しました: ' + error.message);
-}
-
-async function saveNewCoupon() {
-  if (!supabaseClient) return;
-  const name = document.getElementById('m-name').value;
-  const icon = document.getElementById('m-icon').value;
-  const isPoint = document.getElementById('m-is-point').value === 'true';
-  const amount = parseInt(document.getElementById('m-amount').value, 10);
-  const unit = parseInt(document.getElementById('m-unit').value, 10) || 500;
-  const limitDate = document.getElementById('m-limit-date').value;
-  const holder = document.getElementById('m-holder').value;
-
-  if (!name || isNaN(amount) || !limitDate) {
-    alert('銘柄名、金額、期限は必須です');
-    return;
-  }
-
-  const { error } = await supabaseClient.from('coupons').insert([{ name, icon, is_point: isPoint, amount, unit, limit_date: limitDate, holder }]);
-  if (error) {
-    alert('保存エラー: ' + error.message);
-  } else {
-    closeModal();
-    fetchCoupons();
-  }
-}
-
-function renderCalendar() {
-  const grid = document.getElementById('calendar-grid');
-  const label = document.getElementById('month-label');
-  label.textContent = `${currentYear}年 ${currentMonth + 1}月`;
-  while (grid.children.length > 7) grid.removeChild(grid.lastChild);
-
-  const firstDay = new Date(currentYear, currentMonth, 1).getDay();
-  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-
-  for (let i = 0; i < firstDay; i++) {
-    const empty = document.createElement('div');
-    empty.className = 'calendar-cell empty';
-    grid.appendChild(empty);
-  }
-
-  for (let day = 1; day <= daysInMonth; day++) {
-    const cell = document.createElement('div');
-    cell.className = 'calendar-cell';
-    const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const matching = coupons.filter(c => c.limit_date === dateStr);
-    cell.innerHTML = `<span>${day}</span>`;
-
-    if (matching.length > 0) {
-      cell.classList.add('has-item');
-      const dots = document.createElement('div');
-      dots.className = 'item-dots';
-      dots.innerHTML = matching.map(c => c.icon).join('');
-      cell.appendChild(dots);
-    }
-
-    if (selectedDateStr === dateStr) cell.classList.add('is-selected');
-
-    cell.onclick = () => {
-      if (matching.length > 0) {
-        selectedDateStr = dateStr;
-        renderCalendar();
-        renderList(dateStr);
-      } else {
-        resetFilter();
-      }
-    };
-    grid.appendChild(cell);
-  }
-}
-
-function renderList(filterDate = null) {
-  const list = document.getElementById('yutai-list');
-  const title = document.getElementById('list-title');
-  const resetBtn = document.getElementById('reset-filter');
-  list.innerHTML = '';
-
-  let display = [...coupons];
-  if (filterDate) {
-    display = display.filter(c => c.limit_date === filterDate);
-    title.textContent = `${filterDate} 期限 (${display.length}件)`;
-    resetBtn.style.display = 'block';
-  } else {
-    title.textContent = '有効期限が近い順';
-    resetBtn.style.display = 'none';
-    display.sort((a, b) => new Date(a.limit_date) - new Date(b.limit_date));
-  }
-
-  const today = new Date();
-  display.forEach(item => {
-    const diffDays = Math.ceil((new Date(item.limit_date) - today) / (1000 * 60 * 60 * 24));
-    let badgeClass = diffDays <= 7 ? 'expire-soon' : (diffDays <= 30 ? 'expire-warn' : 'expire-normal');
-    let badgeText = diffDays < 0 ? '期限切れ' : `あと${diffDays}日`;
-
-    const isEditing = (editingCouponId === item.id);
-    const card = document.createElement('div');
-    card.className = `yutai-card ${filterDate ? 'highlight' : ''}`;
-
-    const subLabel = item.is_point ? `<small>(1円単位pt)</small>` : `<small>(${item.unit}円券 × ${Math.floor(item.amount / item.unit)}枚)</small>`;
-
-    card.innerHTML = `
-      <div class="card-top">
-        <div class="brand-info">
-          <span class="genre-icon">${item.icon}</span>
-          <span class="brand-name">${item.name}</span>
-        </div>
-        <span class="wallet-badge badge-${item.holder}">${item.holder}</span>
+  <!-- ★ポイント・金額指定利用モーダル -->
+  <div class="modal-overlay" id="use-modal-overlay" onclick="closeUseModalOnBackdrop(event)">
+    <div class="modal-content">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <strong style="font-size:1.1rem;" id="use-modal-title">優待を使う</strong>
+        <span onclick="closeUseModal()" style="font-size:1.5rem; cursor:pointer;">&times;</span>
       </div>
-      <div class="card-mid">
-        ${isEditing ? `
-          <div class="edit-inline-form">
-            ¥<input type="number" class="edit-input" id="input-${item.id}" value="${item.amount}" inputmode="numeric" />
-            <button class="edit-save-btn" onclick="saveDirectBalance(${item.id})">保存</button>
-          </div>
-        ` : `
-          <div class="balance-wrapper" onclick="startEditing(${item.id})">
-            <div class="balance-info">¥${item.amount.toLocaleString()}<span class="edit-hint">✎</span></div>
-            ${subLabel}
-          </div>
-        `}
-        <span class="expire-badge ${badgeClass}">${badgeText}</span>
+      <div class="form-group" style="margin-top: 8px;">
+        <label id="use-modal-label">お会計で使った金額（円）</label>
+        <input type="number" id="use-amount-input" class="form-input" placeholder="例: 1420" inputmode="numeric" />
+        <small style="color:var(--text-sub); margin-top:4px;" id="use-current-balance">現在の残高: ¥0</small>
       </div>
-      <div class="card-bottom">
-        <span class="expire-date-text">期限: ${item.limit_date}</span>
-        <div class="action-btns">
-          ${!item.is_point ? `<button class="use-btn" onclick="useCoupon(${item.id})">−¥${item.unit}</button>` : ''}
-          <button class="use-btn" onclick="startEditing(${item.id})">残高上書き</button>
-        </div>
+      <button class="submit-btn" onclick="confirmUseAmount()">利用を記録する</button>
+    </div>
+  </div>
+
+  <!-- ★使った履歴のタイムライン（外食アルバム）モーダル -->
+  <div class="modal-overlay" id="history-modal-overlay" onclick="closeHistoryModalOnBackdrop(event)">
+    <div class="modal-content">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+        <strong style="font-size:1.1rem;">📖 外食・利用履歴</strong>
+        <span onclick="closeHistoryModal()" style="font-size:1.5rem; cursor:pointer;">&times;</span>
       </div>
-    `;
-    list.appendChild(card);
+      <div class="history-list" id="history-list"></div>
+    </div>
+  </div>
 
-    if (isEditing) {
-      const inputEl = document.getElementById(`input-${item.id}`);
-      if (inputEl) {
-        inputEl.focus();
-        inputEl.select();
-        inputEl.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') saveDirectBalance(item.id);
-        });
-      }
-    }
-  });
-}
-
-function startEditing(id) {
-  editingCouponId = id;
-  renderList(selectedDateStr);
-}
-
-async function saveDirectBalance(id) {
-  const inputEl = document.getElementById(`input-${id}`);
-  if (!inputEl) return;
-  const newAmount = parseInt(inputEl.value, 10);
-  if (!isNaN(newAmount) && newAmount >= 0) await updateAmountInDB(id, newAmount);
-  editingCouponId = null;
-}
-
-async function useCoupon(id) {
-  const target = coupons.find(c => c.id === id);
-  if (target && target.amount >= target.unit) {
-    const nextAmount = target.amount - target.unit;
-    await updateAmountInDB(id, nextAmount);
-  }
-}
-
-function resetFilter() {
-  selectedDateStr = null;
-  renderCalendar();
-  renderList();
-}
-
-function openModal() { document.getElementById('modal-overlay').classList.add('is-open'); }
-function closeModal() { document.getElementById('modal-overlay').classList.remove('is-open'); }
-function closeModalOnBackdrop(e) { if (e.target.id === 'modal-overlay') closeModal(); }
-
-document.getElementById('prev-month').onclick = () => {
-  currentMonth--;
-  if (currentMonth < 0) { currentMonth = 11; currentYear--; }
-  renderCalendar();
-};
-document.getElementById('next-month').onclick = () => {
-  currentMonth++;
-  if (currentMonth > 11) { currentMonth = 0; currentYear++; }
-  renderCalendar();
-};
-
-fetchCoupons();
-setupRealtime();
-  </script>
+  <!-- 外部JavaScriptの読み込み -->
+  <script src="app.js"></script>
 </body>
 </html>
