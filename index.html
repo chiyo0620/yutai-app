@@ -500,13 +500,13 @@
 const SUPABASE_URL = 'https://wfqgitxkhywzormlpite.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmcWdpdHhraHl3em9ybWxwaXRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkzODM2NTgsImV4cCI6MjEwNDk1OTY1OH0.Q-J6x26fZoIjiPOHfTABdJXVoVbG0tvOyFNU_DW1P_o';
 
-let supabase;
+let supabaseClient;  // ← 名前を変える
 try {
-  if (!window.supabase) {
+  if (!window.supabase) { // ※ここは window.supabase のまま！
     throw new Error("Supabaseの通信部品が読み込めませんでした。");
   }
-  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-} catch (e) {
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); // ← 名前を変える
+  } catch (e) {
   alert("初期設定エラー: " + e.message);
 }
 
@@ -517,13 +517,13 @@ let currentMonth = 8;
 let selectedDateStr = null;
 
 async function fetchCoupons() {
-  if (!supabase) {
+  if (!supabaseClient) {
     renderCalendar();
     renderList(selectedDateStr);
     return;
   }
   try {
-    const { data, error } = await supabase.from('coupons').select('*').order('limit_date', { ascending: true });
+    const { data, error } = await supabaseClient.from('coupons').select('*').order('limit_date', { ascending: true });
     if (error) {
       alert('Supabaseのエラー: ' + error.message);
       return;
@@ -538,20 +538,20 @@ async function fetchCoupons() {
 }
 
 function setupRealtime() {
-  if (!supabase) return;
-  supabase.channel('public:coupons').on('postgres_changes', { event: '*', schema: 'public', table: 'coupons' }, () => {
+  if (!supabaseClient) return;
+  supabaseClient.channel('public:coupons').on('postgres_changes', { event: '*', schema: 'public', table: 'coupons' }, () => {
     fetchCoupons();
   }).subscribe();
 }
 
 async function updateAmountInDB(id, newAmount) {
-  if (!supabase) return;
-  const { error } = await supabase.from('coupons').update({ amount: newAmount }).eq('id', id);
+  if (!supabaseClient) return;
+  const { error } = await supabaseClient.from('coupons').update({ amount: newAmount }).eq('id', id);
   if (error) alert('更新に失敗しました: ' + error.message);
 }
 
 async function saveNewCoupon() {
-  if (!supabase) return;
+  if (!supabaseClient) return;
   const name = document.getElementById('m-name').value;
   const icon = document.getElementById('m-icon').value;
   const isPoint = document.getElementById('m-is-point').value === 'true';
@@ -565,7 +565,7 @@ async function saveNewCoupon() {
     return;
   }
 
-  const { error } = await supabase.from('coupons').insert([{ name, icon, is_point: isPoint, amount, unit, limit_date: limitDate, holder }]);
+  const { error } = await supabaseClient.from('coupons').insert([{ name, icon, is_point: isPoint, amount, unit, limit_date: limitDate, holder }]);
   if (error) {
     alert('保存エラー: ' + error.message);
   } else {
