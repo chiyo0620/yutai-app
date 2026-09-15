@@ -417,6 +417,7 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0; /* ← ★この行を追加（枠の自動拡張を防ぐ） */
 }
 .form-group label {
   font-size: 0.8rem;
@@ -424,6 +425,7 @@ h1 {
   color: var(--text-sub);
 }
 .form-input, .form-select {
+  width: 100%;  /* ← ★この行を追加（親の枠幅にぴったり合わせる） */
   padding: 10px 12px;
   border: 1px solid #cbd5e0;
   border-radius: 8px;
