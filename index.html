@@ -497,286 +497,246 @@
   </div>
 
   <script>
-    // ----------------------------------------------------
-    // 1. Supabase 初期設定
-    // ----------------------------------------------------
-    const SUPABASE_URL = 'https://wfqgitxkhywzormlpite.supabase.co'; // https://xxxx.supabase.co
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmcWdpdHhraHl3em9ybWxwaXRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkzODM2NTgsImV4cCI6MjEwNDk1OTY1OH0.Q-J6x26fZoIjiPOHfTABdJXVoVbG0tvOyFNU_DW1P_o'; // eyJ...
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const SUPABASE_URL = 'https://wfqgitxkhywzormlpite.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmcWdpdHhraHl3em9ybWxwaXRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkzODM2NTgsImV4cCI6MjEwNDk1OTY1OH0.Q-J6x26fZoIjiPOHfTABdJXVoVbG0tvOyFNU_DW1P_o';
 
-    // 状態管理
-    let coupons = [];
-    let editingCouponId = null;
-    let currentYear = 2026;
-    let currentMonth = 8; // 9月 (0始まり)
-    let selectedDateStr = null;
+let supabase;
+try {
+  if (!window.supabase) {
+    throw new Error("Supabaseの通信部品が読み込めませんでした。");
+  }
+  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+} catch (e) {
+  alert("初期設定エラー: " + e.message);
+}
 
-    // ----------------------------------------------------
-    // 2. Supabase 連携ロジック (読み込み・同期・書き込み)
-    // ----------------------------------------------------
+let coupons = [];
+let editingCouponId = null;
+let currentYear = 2026;
+let currentMonth = 8;
+let selectedDateStr = null;
+
 async function fetchCoupons() {
-      try {
-        const { data, error } = await supabase
-          .from('coupons')
-          .select('*')
-          .order('limit_date', { ascending: true });
-
-        if (error) {
-          alert('Supabaseのエラー: ' + error.message);
-          return;
-        }
-        coupons = data || [];
-      } catch (err) {
-        // 通信そのものが失敗した場合はここで確実に捕まえる
-        alert('致命的な通信エラー: ' + err.message);
-      } finally {
-        // 成功しても失敗しても、カレンダーの画面だけは絶対に描画する
-        renderCalendar();
-        renderList(selectedDateStr);
-      }
+  if (!supabase) {
+    renderCalendar();
+    renderList(selectedDateStr);
+    return;
+  }
+  try {
+    const { data, error } = await supabase.from('coupons').select('*').order('limit_date', { ascending: true });
+    if (error) {
+      alert('Supabaseのエラー: ' + error.message);
+      return;
     }
-    
-    // リアルタイム同期の購読設定
-    function setupRealtime() {
-      supabase
-        .channel('public:coupons')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'coupons' }, () => {
-          fetchCoupons(); // 誰かが変更したら再読み込み
-        })
-        .subscribe();
-    }
+    coupons = data || [];
+  } catch (err) {
+    alert('致命的な通信エラー: ' + err.message);
+  } finally {
+    renderCalendar();
+    renderList(selectedDateStr);
+  }
+}
 
-    // 残高の更新
-    async function updateAmountInDB(id, newAmount) {
-      const { error } = await supabase
-        .from('coupons')
-        .update({ amount: newAmount })
-        .eq('id', id);
-
-      if (error) alert('更新に失敗しました: ' + error.message);
-    }
-
-    // 新規優待の登録
-    async function saveNewCoupon() {
-      const name = document.getElementById('m-name').value;
-      const icon = document.getElementById('m-icon').value;
-      const isPoint = document.getElementById('m-is-point').value === 'true';
-      const amount = parseInt(document.getElementById('m-amount').value, 10);
-      const unit = parseInt(document.getElementById('m-unit').value, 10) || 500;
-      const limitDate = document.getElementById('m-limit-date').value;
-      const holder = document.getElementById('m-holder').value;
-
-      if (!name || isNaN(amount) || !limitDate) {
-        alert('銘柄名、金額、期限は必須です');
-        return;
-      }
-
-      const { error } = await supabase.from('coupons').insert([{
-        name,
-        icon,
-        is_point: isPoint,
-        amount,
-        unit,
-        limit_date: limitDate,
-        holder
-      }]);
-
-      if (error) {
-        alert('保存エラー: ' + error.message);
-      } else {
-        closeModal();
-        fetchCoupons();
-      }
-    }
-
-    // ----------------------------------------------------
-    // 3. UI 描画ロジック
-    // ----------------------------------------------------
-    function renderCalendar() {
-      const grid = document.getElementById('calendar-grid');
-      const label = document.getElementById('month-label');
-      label.textContent = `${currentYear}年 ${currentMonth + 1}月`;
-
-      while (grid.children.length > 7) {
-        grid.removeChild(grid.lastChild);
-      }
-
-      const firstDay = new Date(currentYear, currentMonth, 1).getDay();
-      const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-
-      for (let i = 0; i < firstDay; i++) {
-        const empty = document.createElement('div');
-        empty.className = 'calendar-cell empty';
-        grid.appendChild(empty);
-      }
-
-      for (let day = 1; day <= daysInMonth; day++) {
-        const cell = document.createElement('div');
-        cell.className = 'calendar-cell';
-        const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        const matching = coupons.filter(c => c.limit_date === dateStr);
-
-        cell.innerHTML = `<span>${day}</span>`;
-
-        if (matching.length > 0) {
-          cell.classList.add('has-item');
-          const dots = document.createElement('div');
-          dots.className = 'item-dots';
-          dots.innerHTML = matching.map(c => c.icon).join('');
-          cell.appendChild(dots);
-        }
-
-        if (selectedDateStr === dateStr) cell.classList.add('is-selected');
-
-        cell.onclick = () => {
-          if (matching.length > 0) {
-            selectedDateStr = dateStr;
-            renderCalendar();
-            renderList(dateStr);
-          } else {
-            resetFilter();
-          }
-        };
-
-        grid.appendChild(cell);
-      }
-    }
-
-    function renderList(filterDate = null) {
-      const list = document.getElementById('yutai-list');
-      const title = document.getElementById('list-title');
-      const resetBtn = document.getElementById('reset-filter');
-      list.innerHTML = '';
-
-      let display = [...coupons];
-      if (filterDate) {
-        display = display.filter(c => c.limit_date === filterDate);
-        title.textContent = `${filterDate} 期限 (${display.length}件)`;
-        resetBtn.style.display = 'block';
-      } else {
-        title.textContent = '有効期限が近い順';
-        resetBtn.style.display = 'none';
-        display.sort((a, b) => new Date(a.limit_date) - new Date(b.limit_date));
-      }
-
-      const today = new Date();
-
-      display.forEach(item => {
-        const diffDays = Math.ceil((new Date(item.limit_date) - today) / (1000 * 60 * 60 * 24));
-        let badgeClass = diffDays <= 7 ? 'expire-soon' : (diffDays <= 30 ? 'expire-warn' : 'expire-normal');
-        let badgeText = diffDays < 0 ? '期限切れ' : `あと${diffDays}日`;
-
-        const isEditing = (editingCouponId === item.id);
-        const card = document.createElement('div');
-        card.className = `yutai-card ${filterDate ? 'highlight' : ''}`;
-
-        const subLabel = item.is_point 
-          ? `<small>(1円単位pt)</small>` 
-          : `<small>(${item.unit}円券 × ${Math.floor(item.amount / item.unit)}枚)</small>`;
-
-        card.innerHTML = `
-          <div class="card-top">
-            <div class="brand-info">
-              <span class="genre-icon">${item.icon}</span>
-              <span class="brand-name">${item.name}</span>
-            </div>
-            <span class="wallet-badge badge-${item.holder}">${item.holder}</span>
-          </div>
-          <div class="card-mid">
-            ${isEditing ? `
-              <div class="edit-inline-form">
-                ¥<input type="number" class="edit-input" id="input-${item.id}" value="${item.amount}" inputmode="numeric" />
-                <button class="edit-save-btn" onclick="saveDirectBalance(${item.id})">保存</button>
-              </div>
-            ` : `
-              <div class="balance-wrapper" onclick="startEditing(${item.id})">
-                <div class="balance-info">
-                  ¥${item.amount.toLocaleString()}
-                  <span class="edit-hint">✎</span>
-                </div>
-                ${subLabel}
-              </div>
-            `}
-            <span class="expire-badge ${badgeClass}">${badgeText}</span>
-          </div>
-          <div class="card-bottom">
-            <span class="expire-date-text">期限: ${item.limit_date}</span>
-            <div class="action-btns">
-              ${!item.is_point ? `<button class="use-btn" onclick="useCoupon(${item.id})">−¥${item.unit}</button>` : ''}
-              <button class="use-btn" onclick="startEditing(${item.id})">残高上書き</button>
-            </div>
-          </div>
-        `;
-        list.appendChild(card);
-
-        if (isEditing) {
-          const inputEl = document.getElementById(`input-${item.id}`);
-          if (inputEl) {
-            inputEl.focus();
-            inputEl.select();
-            inputEl.addEventListener('keydown', (e) => {
-              if (e.key === 'Enter') saveDirectBalance(item.id);
-            });
-          }
-        }
-      });
-    }
-
-    function startEditing(id) {
-      editingCouponId = id;
-      renderList(selectedDateStr);
-    }
-
-    async function saveDirectBalance(id) {
-      const inputEl = document.getElementById(`input-${id}`);
-      if (!inputEl) return;
-      const newAmount = parseInt(inputEl.value, 10);
-      if (!isNaN(newAmount) && newAmount >= 0) {
-        await updateAmountInDB(id, newAmount);
-      }
-      editingCouponId = null;
-    }
-
-    async function useCoupon(id) {
-      const target = coupons.find(c => c.id === id);
-      if (target && target.amount >= target.unit) {
-        const nextAmount = target.amount - target.unit;
-        await updateAmountInDB(id, nextAmount);
-      }
-    }
-
-    function resetFilter() {
-      selectedDateStr = null;
-      renderCalendar();
-      renderList();
-    }
-
-    // モーダル操作
-    function openModal() {
-      document.getElementById('modal-overlay').classList.add('is-open');
-    }
-    function closeModal() {
-      document.getElementById('modal-overlay').classList.remove('is-open');
-    }
-    function closeModalOnBackdrop(e) {
-      if (e.target.id === 'modal-overlay') closeModal();
-    }
-
-    // カレンダー月送り
-    document.getElementById('prev-month').onclick = () => {
-      currentMonth--;
-      if (currentMonth < 0) { currentMonth = 11; currentYear--; }
-      renderCalendar();
-    };
-    document.getElementById('next-month').onclick = () => {
-      currentMonth++;
-      if (currentMonth > 11) { currentMonth = 0; currentYear++; }
-      renderCalendar();
-    };
-
-    // 初期化実行
+function setupRealtime() {
+  if (!supabase) return;
+  supabase.channel('public:coupons').on('postgres_changes', { event: '*', schema: 'public', table: 'coupons' }, () => {
     fetchCoupons();
-    setupRealtime();
+  }).subscribe();
+}
+
+async function updateAmountInDB(id, newAmount) {
+  if (!supabase) return;
+  const { error } = await supabase.from('coupons').update({ amount: newAmount }).eq('id', id);
+  if (error) alert('更新に失敗しました: ' + error.message);
+}
+
+async function saveNewCoupon() {
+  if (!supabase) return;
+  const name = document.getElementById('m-name').value;
+  const icon = document.getElementById('m-icon').value;
+  const isPoint = document.getElementById('m-is-point').value === 'true';
+  const amount = parseInt(document.getElementById('m-amount').value, 10);
+  const unit = parseInt(document.getElementById('m-unit').value, 10) || 500;
+  const limitDate = document.getElementById('m-limit-date').value;
+  const holder = document.getElementById('m-holder').value;
+
+  if (!name || isNaN(amount) || !limitDate) {
+    alert('銘柄名、金額、期限は必須です');
+    return;
+  }
+
+  const { error } = await supabase.from('coupons').insert([{ name, icon, is_point: isPoint, amount, unit, limit_date: limitDate, holder }]);
+  if (error) {
+    alert('保存エラー: ' + error.message);
+  } else {
+    closeModal();
+    fetchCoupons();
+  }
+}
+
+function renderCalendar() {
+  const grid = document.getElementById('calendar-grid');
+  const label = document.getElementById('month-label');
+  label.textContent = `${currentYear}年 ${currentMonth + 1}月`;
+  while (grid.children.length > 7) grid.removeChild(grid.lastChild);
+
+  const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+
+  for (let i = 0; i < firstDay; i++) {
+    const empty = document.createElement('div');
+    empty.className = 'calendar-cell empty';
+    grid.appendChild(empty);
+  }
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const cell = document.createElement('div');
+    cell.className = 'calendar-cell';
+    const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const matching = coupons.filter(c => c.limit_date === dateStr);
+    cell.innerHTML = `<span>${day}</span>`;
+
+    if (matching.length > 0) {
+      cell.classList.add('has-item');
+      const dots = document.createElement('div');
+      dots.className = 'item-dots';
+      dots.innerHTML = matching.map(c => c.icon).join('');
+      cell.appendChild(dots);
+    }
+
+    if (selectedDateStr === dateStr) cell.classList.add('is-selected');
+
+    cell.onclick = () => {
+      if (matching.length > 0) {
+        selectedDateStr = dateStr;
+        renderCalendar();
+        renderList(dateStr);
+      } else {
+        resetFilter();
+      }
+    };
+    grid.appendChild(cell);
+  }
+}
+
+function renderList(filterDate = null) {
+  const list = document.getElementById('yutai-list');
+  const title = document.getElementById('list-title');
+  const resetBtn = document.getElementById('reset-filter');
+  list.innerHTML = '';
+
+  let display = [...coupons];
+  if (filterDate) {
+    display = display.filter(c => c.limit_date === filterDate);
+    title.textContent = `${filterDate} 期限 (${display.length}件)`;
+    resetBtn.style.display = 'block';
+  } else {
+    title.textContent = '有効期限が近い順';
+    resetBtn.style.display = 'none';
+    display.sort((a, b) => new Date(a.limit_date) - new Date(b.limit_date));
+  }
+
+  const today = new Date();
+  display.forEach(item => {
+    const diffDays = Math.ceil((new Date(item.limit_date) - today) / (1000 * 60 * 60 * 24));
+    let badgeClass = diffDays <= 7 ? 'expire-soon' : (diffDays <= 30 ? 'expire-warn' : 'expire-normal');
+    let badgeText = diffDays < 0 ? '期限切れ' : `あと${diffDays}日`;
+
+    const isEditing = (editingCouponId === item.id);
+    const card = document.createElement('div');
+    card.className = `yutai-card ${filterDate ? 'highlight' : ''}`;
+
+    const subLabel = item.is_point ? `<small>(1円単位pt)</small>` : `<small>(${item.unit}円券 × ${Math.floor(item.amount / item.unit)}枚)</small>`;
+
+    card.innerHTML = `
+      <div class="card-top">
+        <div class="brand-info">
+          <span class="genre-icon">${item.icon}</span>
+          <span class="brand-name">${item.name}</span>
+        </div>
+        <span class="wallet-badge badge-${item.holder}">${item.holder}</span>
+      </div>
+      <div class="card-mid">
+        ${isEditing ? `
+          <div class="edit-inline-form">
+            ¥<input type="number" class="edit-input" id="input-${item.id}" value="${item.amount}" inputmode="numeric" />
+            <button class="edit-save-btn" onclick="saveDirectBalance(${item.id})">保存</button>
+          </div>
+        ` : `
+          <div class="balance-wrapper" onclick="startEditing(${item.id})">
+            <div class="balance-info">¥${item.amount.toLocaleString()}<span class="edit-hint">✎</span></div>
+            ${subLabel}
+          </div>
+        `}
+        <span class="expire-badge ${badgeClass}">${badgeText}</span>
+      </div>
+      <div class="card-bottom">
+        <span class="expire-date-text">期限: ${item.limit_date}</span>
+        <div class="action-btns">
+          ${!item.is_point ? `<button class="use-btn" onclick="useCoupon(${item.id})">−¥${item.unit}</button>` : ''}
+          <button class="use-btn" onclick="startEditing(${item.id})">残高上書き</button>
+        </div>
+      </div>
+    `;
+    list.appendChild(card);
+
+    if (isEditing) {
+      const inputEl = document.getElementById(`input-${item.id}`);
+      if (inputEl) {
+        inputEl.focus();
+        inputEl.select();
+        inputEl.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') saveDirectBalance(item.id);
+        });
+      }
+    }
+  });
+}
+
+function startEditing(id) {
+  editingCouponId = id;
+  renderList(selectedDateStr);
+}
+
+async function saveDirectBalance(id) {
+  const inputEl = document.getElementById(`input-${id}`);
+  if (!inputEl) return;
+  const newAmount = parseInt(inputEl.value, 10);
+  if (!isNaN(newAmount) && newAmount >= 0) await updateAmountInDB(id, newAmount);
+  editingCouponId = null;
+}
+
+async function useCoupon(id) {
+  const target = coupons.find(c => c.id === id);
+  if (target && target.amount >= target.unit) {
+    const nextAmount = target.amount - target.unit;
+    await updateAmountInDB(id, nextAmount);
+  }
+}
+
+function resetFilter() {
+  selectedDateStr = null;
+  renderCalendar();
+  renderList();
+}
+
+function openModal() { document.getElementById('modal-overlay').classList.add('is-open'); }
+function closeModal() { document.getElementById('modal-overlay').classList.remove('is-open'); }
+function closeModalOnBackdrop(e) { if (e.target.id === 'modal-overlay') closeModal(); }
+
+document.getElementById('prev-month').onclick = () => {
+  currentMonth--;
+  if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+  renderCalendar();
+};
+document.getElementById('next-month').onclick = () => {
+  currentMonth++;
+  if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+  renderCalendar();
+};
+
+fetchCoupons();
+setupRealtime();
   </script>
 </body>
 </html>
