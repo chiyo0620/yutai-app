@@ -9,9 +9,9 @@
   --alert-red: #e53e3e;
   --alert-yellow: #dd6b20;
   --badge-home: #718096;
-  --badge-takashi: #3182ce;
-  --badge-chiyo: #d53f8c;
-  --badge-suyu: #d53f99;
+  --badge-takashi: #5595d1;
+  --badge-chiyo: #f9c44d;
+  --badge-suyu: #f88379;
 }
 
 * {
@@ -254,7 +254,7 @@ h1 {
 }
 .badge-ちよ { background-color: var(--badge-chiyo); }
 .badge-たかし { background-color: var(--badge-takashi); }
-.badge-すゆ { background-color: var(--badge-takashi); }
+.badge-すゆ { background-color: var(--badge-suyu); }
 .badge-自宅 { background-color: var(--badge-home); }
 
 .card-mid {
