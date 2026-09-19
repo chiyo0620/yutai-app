@@ -402,6 +402,12 @@ function renderList(filterDate = null) {
       }
     }
   });
+// 未使用の総残高を計算して表示する
+  const totalBalance = coupons.reduce((sum, item) => sum + Number(item.amount), 0);
+  const displayEl = document.getElementById('total-balance-display');
+  if (displayEl) {
+    displayEl.textContent = `未使用の総残高: ¥${totalBalance.toLocaleString()}`;
+  }
 }
 
 // 残高上書きの開始と保存
@@ -423,10 +429,6 @@ function resetFilter() {
   selectedDateStr = null;
   renderCalendar();
   renderList();
-  // 今あるクーポンの残高(amount)を全部足し算する
-  const totalBalance = coupons.reduce((sum, item) => sum + item.amount, 0);
-  // さきほどHTMLに作った場所に文字として書き込む
-  document.getElementById('total-balance-display').textContent = `未使用の総残高: ¥${totalBalance.toLocaleString()}`;
 }
 
 // 新規モーダルの開閉
