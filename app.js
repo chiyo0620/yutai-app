@@ -423,6 +423,10 @@ function resetFilter() {
   selectedDateStr = null;
   renderCalendar();
   renderList();
+  // 今あるクーポンの残高(amount)を全部足し算する
+  const totalBalance = coupons.reduce((sum, item) => sum + item.amount, 0);
+  // さきほどHTMLに作った場所に文字として書き込む
+  document.getElementById('total-balance-display').textContent = `未使用の総残高: ¥${totalBalance.toLocaleString()}`;
 }
 
 // 新規モーダルの開閉
