@@ -115,7 +115,25 @@ h1 {
   font-weight: 800;
   color: var(--primary);
 }
+/* --- 「今年」表示のときの色 --- */
+.savings-card.period-year .savings-title {
+  color: #c05621; /* 落ち着いた深みのあるオレンジ */
+}
+.savings-card.period-year .savings-amount {
+  color: #ff6b4a; /* メインカラー（オレンジ系） */
+}
 
+/* --- 「今月」表示のときの色 --- */
+.savings-card.period-month .savings-title {
+  color: #2b6cb0; /* 落ち着いたブルー */
+}
+.savings-card.period-month .savings-amount {
+  color: #3182ce; /* 爽やかなブルー */
+}
+.savings-card.period-month .savings-toggle-btn {
+  background: #ebf8ff;
+  color: #3182ce;
+}
 /* カレンダーエリア */
 .calendar-card {
   background: var(--card-bg);
