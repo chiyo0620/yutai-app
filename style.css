@@ -520,3 +520,9 @@ h1 {
   background: #f0fff4;
   color: #38a169;
 }
+/* iPhoneの日付入力枠のはみ出しを防ぐ調整 */
+input[type="date"].form-input {
+  padding-top: 0;
+  padding-bottom: 0;
+  -webkit-appearance: none;
+}
