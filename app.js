@@ -146,59 +146,77 @@ async function saveNewCoupon() {
   }
 }
 
-// ★浮いた外食費の集計と表示
+// ★浮いた外食費と総残高の集計・表示
 function renderSavingsCard() {
   const now = new Date();
   const currentYearNum = now.getFullYear();
   const currentMonthNum = now.getMonth() + 1;
 
-  let total = 0;
+  // 1. 今月と今年の浮いた金額を両方計算する
+  let totalYear = 0;
+  let totalMonth = 0;
   couponLogs.forEach(log => {
     if (!log.used_date) return;
     const parts = log.used_date.split('-');
     const logYear = parseInt(parts[0], 10);
     const logMonth = parseInt(parts[1], 10);
 
-    if (savingsPeriod === 'year') {
-      if (logYear === currentYearNum) total += log.amount_used;
-    } else {
-      if (logYear === currentYearNum && logMonth === currentMonthNum) total += log.amount_used;
+    if (logYear === currentYearNum) {
+      totalYear += log.amount_used;
+      if (logMonth === currentMonthNum) {
+        totalMonth += log.amount_used;
+      }
     }
   });
 
+  // 2. 未使用の総残高を計算する
+  const totalBalance = coupons.reduce((sum, item) => sum + Number(item.amount), 0);
+
+  // 3. 画面の要素を取得
   const cardEl = document.querySelector('.savings-card');
   const titleEl = document.getElementById('savings-title');
-  const toggleBtn = document.getElementById('savings-toggle-btn');
   const amountEl = document.getElementById('savings-amount');
+  const subEl = document.getElementById('savings-sub');
 
+  // クラスを一旦すべてリセット
+  cardEl.classList.remove('period-year', 'period-month', 'period-balance');
+
+  // 4. モードに合わせて表示を切り替える
   if (savingsPeriod === 'year') {
-    // 今年モードの目印をつける
     cardEl.classList.add('period-year');
-    cardEl.classList.remove('period-month');
-
     titleEl.textContent = '今年浮いた外食費（累計）';
-    toggleBtn.textContent = '今月に切替';
-  } else {
-    // 今月モードの目印をつける
+    amountEl.textContent = `¥${totalYear.toLocaleString()}`;
+    subEl.textContent = 'タップして利用履歴を見る 📖';
+  } else if (savingsPeriod === 'month') {
     cardEl.classList.add('period-month');
-    cardEl.classList.remove('period-year');
-
     titleEl.textContent = '今月浮いた外食費（累計）';
-    toggleBtn.textContent = '今年に切替';
+    amountEl.textContent = `¥${totalMonth.toLocaleString()}`;
+    subEl.textContent = 'タップして利用履歴を見る 📖';
+  } else if (savingsPeriod === 'balance') {
+    cardEl.classList.add('period-balance');
+    titleEl.textContent = '未使用の優待総残高';
+    amountEl.textContent = `¥${totalBalance.toLocaleString()}`;
+    subEl.textContent = 'これから外食で使える金額です 🍽️';
   }
-
-  amountEl.textContent = `¥${total.toLocaleString()}`;
 }
 
-// 期間の切替（今年 ⇄ 今月）
+// 期間の切替（今年 ➔ 今月 ➔ 残高 ➔ 今年...）
 function toggleSavingsPeriod(e) {
   e.stopPropagation(); // モーダルが開くのを防止
-  savingsPeriod = (savingsPeriod === 'year') ? 'month' : 'year';
+  if (savingsPeriod === 'year') {
+    savingsPeriod = 'month';
+  } else if (savingsPeriod === 'month') {
+    savingsPeriod = 'balance';
+  } else {
+    savingsPeriod = 'year';
+  }
   renderSavingsCard();
 }
 
 // 累計カードをクリックしたら履歴モーダルを開く
 function handleSavingsCardClick(e) {
+  // 残高モードのときは履歴を開かない
+  if (savingsPeriod === 'balance') return;
   openHistoryModal();
 }
 
