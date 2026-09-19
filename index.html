@@ -24,19 +24,18 @@
       </div>
     </header>
 
-    <!-- ★第1弾：浮いた外食費カード（タップで履歴表示、切替ボタンで今月/今年） -->
+<!-- ★修正後：浮いた外食費カード -->
     <section class="savings-card" onclick="handleSavingsCardClick(event)">
       <div class="savings-left">
         <div class="savings-title-wrap">
           <span class="savings-title" id="savings-title">今年浮いた外食費（累計）</span>
-          <button class="savings-toggle-btn" id="savings-toggle-btn" onclick="toggleSavingsPeriod(event)">今月に切替</button>
+          <button class="savings-toggle-btn" id="savings-toggle-btn" onclick="toggleSavingsPeriod(event)">切替</button>
         </div>
-        <div class="savings-sub">タップして利用履歴を見る 📖</div>
-        <div style="font-size: 0.8rem; font-weight: 600; color: #4a5568; margin-top: 6px;" id="total-balance-display">未使用の総残高: ¥0</div>
+        <div class="savings-sub" id="savings-sub">タップして利用履歴を見る 📖</div>
       </div>
       <div class="savings-amount" id="savings-amount">¥0</div>
     </section>
-
+    
     <!-- カレンダーエリア -->
     <section class="calendar-card">
       <div class="calendar-header">
