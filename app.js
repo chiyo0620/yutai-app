@@ -166,17 +166,27 @@ function renderSavingsCard() {
     }
   });
 
+  const cardEl = document.querySelector('.savings-card');
   const titleEl = document.getElementById('savings-title');
   const toggleBtn = document.getElementById('savings-toggle-btn');
   const amountEl = document.getElementById('savings-amount');
 
   if (savingsPeriod === 'year') {
+    // 今年モードの目印をつける
+    cardEl.classList.add('period-year');
+    cardEl.classList.remove('period-month');
+
     titleEl.textContent = '今年浮いた外食費（累計）';
     toggleBtn.textContent = '今月に切替';
   } else {
+    // 今月モードの目印をつける
+    cardEl.classList.add('period-month');
+    cardEl.classList.remove('period-year');
+
     titleEl.textContent = '今月浮いた外食費（累計）';
     toggleBtn.textContent = '今年に切替';
   }
+
   amountEl.textContent = `¥${total.toLocaleString()}`;
 }
 
