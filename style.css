@@ -505,3 +505,14 @@ h1 {
   padding: 24px 0;
   font-size: 0.85rem;
 }
+/* --- 「総残高」表示のときの色（グリーン系） --- */
+.savings-card.period-balance .savings-title {
+  color: #276749; /* 深緑 */
+}
+.savings-card.period-balance .savings-amount {
+  color: #38a169; /* 明るい緑 */
+}
+.savings-card.period-balance .savings-toggle-btn {
+  background: #f0fff4;
+  color: #38a169;
+}
