@@ -9,8 +9,9 @@
   --alert-red: #e53e3e;
   --alert-yellow: #dd6b20;
   --badge-home: #718096;
-  --badge-husband: #3182ce;
-  --badge-wife: #d53f8c;
+  --badge-takashi: #3182ce;
+  --badge-chiyo: #d53f8c;
+  --badge-suyu: #d53f99;
 }
 
 * {
@@ -155,7 +156,7 @@ h1 {
   font-weight: 600;
 }
 .weekday-header:first-child { color: var(--alert-red); }
-.weekday-header:last-child { color: var(--badge-husband); }
+.weekday-header:last-child { color: var(--badge-takashi); }
 
 .calendar-cell {
   aspect-ratio: 1;
@@ -251,8 +252,9 @@ h1 {
   border-radius: 999px;
   color: #fff;
 }
-.badge-妻の財布 { background-color: var(--badge-wife); }
-.badge-夫の財布 { background-color: var(--badge-husband); }
+.badge-ちよ { background-color: var(--badge-chiyo); }
+.badge-たかし { background-color: var(--badge-takashi); }
+.badge-すゆ { background-color: var(--badge-takashi); }
 .badge-自宅 { background-color: var(--badge-home); }
 
 .card-mid {
