@@ -1,15 +1,5 @@
-const SUPABASE_URL = 'https://wfqgitxkhywzormlpite.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmcWdpdHhraHl3em9ybWxwaXRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkzODM2NTgsImV4cCI6MjEwNDk1OTY1OH0.Q-J6x26fZoIjiPOHfTABdJXVoVbG0tvOyFNU_DW1P_o';
-
-let supabaseClient;
-try {
-  if (!window.supabase) {
-    throw new Error("Supabaseの通信部品が読み込めませんでした。");
-  }
-  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-} catch (e) {
-  alert("初期設定エラー: " + e.message);
-}
+// 新しい受付スタッフ（GAS）のURL
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbwBQemPSreyB3VoDLcNBYilt4VB-_7GSf5RmVfk-wVYWU-uQhR9wk8pjbXalCpH1QAy/exec';
 
 // 状態管理
 let coupons = [];
@@ -18,104 +8,125 @@ let editingCouponId = null;
 let currentYear = new Date().getFullYear();
 let currentMonth = new Date().getMonth();
 let selectedDateStr = null;
-let savingsPeriod = 'year'; // 'year' または 'month'
-let currentUsingCoupon = null; // ポイント利用対象の優待
+let savingsPeriod = 'balance'; // 初期表示モード
+let currentUsingCoupon = null;
 
-// 優待一覧を取得
+// 日付のズレを防ぐための変換関数
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  if (typeof dateStr === 'string' && dateStr.length === 10) return dateStr;
+  const d = new Date(dateStr);
+  if (isNaN(d)) return dateStr;
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+// 1. スプレッドシートから優待一覧を取得
 async function fetchCoupons() {
-  if (!supabaseClient) {
-    renderCalendar();
-    renderList(selectedDateStr);
-    return;
-  }
   try {
-    const { data, error } = await supabaseClient.from('coupons').select('*').order('limit_date', { ascending: true });
-    if (error) {
-      alert('優待データの取得エラー: ' + error.message);
-      return;
-    }
-    coupons = data || [];
+    const res = await fetch(GAS_URL + '?action=getCoupons');
+    const data = await res.json();
+    coupons = data.map(c => {
+      c.limit_date = formatDate(c.limit_date);
+      c.amount = Number(c.amount) || 0;
+      c.unit = Number(c.unit) || 500;
+      c.is_point = (String(c.is_point).toLowerCase() === 'true');
+      return c;
+    });
   } catch (err) {
-    alert('通信エラー: ' + err.message);
+    console.error('通信エラー:', err);
   } finally {
     renderCalendar();
     renderList(selectedDateStr);
+    renderSavingsCard();
   }
 }
 
-// 利用履歴を取得
+// 2. スプレッドシートから利用履歴を取得
 async function fetchLogs() {
-  if (!supabaseClient) return;
   try {
-    const { data, error } = await supabaseClient.from('coupon_logs').select('*').order('created_at', { ascending: false });
-    if (error) {
-      console.error('利用履歴の取得エラー:', error.message);
-      return;
-    }
-    couponLogs = data || [];
+    const res = await fetch(GAS_URL + '?action=getLogs');
+    const data = await res.json();
+    couponLogs = data.map(log => {
+      log.used_date = formatDate(log.used_date);
+      log.amount_used = Number(log.amount_used) || 0;
+      return log;
+    });
     renderSavingsCard();
   } catch (err) {
-    console.error('通信エラー:', err.message);
+    console.error('通信エラー:', err);
   }
-}
-
-// リアルタイム同期の設定
-function setupRealtime() {
-  if (!supabaseClient) return;
-  supabaseClient.channel('public:coupons').on('postgres_changes', { event: '*', schema: 'public', table: 'coupons' }, () => {
-    fetchCoupons();
-  }).subscribe();
-
-  supabaseClient.channel('public:coupon_logs').on('postgres_changes', { event: '*', schema: 'public', table: 'coupon_logs' }, () => {
-    fetchLogs();
-  }).subscribe();
 }
 
 // 残高の直接更新（手動修正用）
 async function updateAmountInDB(id, newAmount) {
-  if (!supabaseClient) return;
-  const { error } = await supabaseClient.from('coupons').update({ amount: newAmount }).eq('id', id);
-  if (error) alert('更新に失敗しました: ' + error.message);
+  // ★楽観的UI：通信を待たずに画面だけ先に書き換えてサクサク感を作る
+  const target = coupons.find(c => c.id == id);
+  if (target) target.amount = newAmount;
+  editingCouponId = null;
+  renderList(selectedDateStr);
+  renderSavingsCard();
+
+  try {
+    await fetch(GAS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'updateAmount', id: id, amount: newAmount })
+    });
+  } catch (error) {
+    console.error('更新エラー:', error);
+  }
 }
 
 // 優待を利用して履歴に記録する（共通処理）
 async function applyCouponUsage(coupon, amountUsed) {
-  if (!supabaseClient) return;
   if (amountUsed <= 0 || amountUsed > coupon.amount) {
     alert('残高の範囲内で金額を入力してください');
     return;
   }
 
   const nextAmount = coupon.amount - amountUsed;
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = formatDate(new Date());
 
-  // 1. 残高を減らす
-  const { error: err1 } = await supabaseClient.from('coupons').update({ amount: nextAmount }).eq('id', coupon.id);
-  if (err1) {
-    alert('残高更新エラー: ' + err1.message);
-    return;
-  }
-
-  // 2. 利用履歴を保存する
-  const { error: err2 } = await supabaseClient.from('coupon_logs').insert([{
+  // ★楽観的UI：通信を待たずに画面だけ先に書き換える
+  coupon.amount = nextAmount;
+  couponLogs.unshift({
     coupon_id: coupon.id,
     coupon_name: coupon.name,
     icon: coupon.icon,
     amount_used: amountUsed,
     used_date: todayStr
-  }]);
+  });
+  renderList(selectedDateStr);
+  renderSavingsCard();
 
-  if (err2) {
-    alert('履歴保存エラー: ' + err2.message);
+  try {
+    // スプレッドシートへ残高更新を依頼
+    await fetch(GAS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'updateAmount', id: coupon.id, amount: nextAmount })
+    });
+    // スプレッドシートへ履歴保存を依頼
+    await fetch(GAS_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'insertLog',
+        coupon_id: coupon.id,
+        coupon_name: coupon.name,
+        icon: coupon.icon,
+        amount_used: amountUsed,
+        used_date: todayStr
+      })
+    });
+  } catch (error) {
+    console.error('履歴保存エラー:', error);
   }
-
-  fetchCoupons();
-  fetchLogs();
 }
 
 // 紙券の「−¥500」ボタン処理
 async function usePaperCoupon(id) {
-  const target = coupons.find(c => c.id === id);
+  const target = coupons.find(c => c.id == id);
   if (target && target.amount >= target.unit) {
     await applyCouponUsage(target, target.unit);
   }
@@ -123,7 +134,6 @@ async function usePaperCoupon(id) {
 
 // 新規優待の保存
 async function saveNewCoupon() {
-  if (!supabaseClient) return;
   const name = document.getElementById('m-name').value;
   const icon = document.getElementById('m-icon').value;
   const isPoint = document.getElementById('m-is-point').value === 'true';
@@ -137,12 +147,25 @@ async function saveNewCoupon() {
     return;
   }
 
-  const { error } = await supabaseClient.from('coupons').insert([{ name, icon, is_point: isPoint, amount, unit, limit_date: limitDate, holder }]);
-  if (error) {
-    alert('保存エラー: ' + error.message);
-  } else {
+  try {
+    await fetch(GAS_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'insertCoupon',
+        name: name,
+        icon: icon,
+        is_point: isPoint,
+        amount: amount,
+        unit: unit,
+        limit_date: limitDate,
+        holder: holder
+      })
+    });
     closeModal();
-    fetchCoupons();
+    // 登録後はデータを再取得して画面を更新
+    await fetchCoupons();
+  } catch (error) {
+    alert('保存エラー: 通信に失敗しました');
   }
 }
 
@@ -152,12 +175,13 @@ function renderSavingsCard() {
   const currentYearNum = now.getFullYear();
   const currentMonthNum = now.getMonth() + 1;
 
-  // 1. 今月と今年の浮いた金額を両方計算する
   let totalYear = 0;
   let totalMonth = 0;
   couponLogs.forEach(log => {
     if (!log.used_date) return;
-    const parts = log.used_date.split('-');
+    const parts = String(log.used_date).split('-');
+    if (parts.length < 2) return;
+    
     const logYear = parseInt(parts[0], 10);
     const logMonth = parseInt(parts[1], 10);
 
@@ -169,19 +193,17 @@ function renderSavingsCard() {
     }
   });
 
-  // 2. 未使用の総残高を計算する
   const totalBalance = coupons.reduce((sum, item) => sum + Number(item.amount), 0);
 
-  // 3. 画面の要素を取得
   const cardEl = document.querySelector('.savings-card');
   const titleEl = document.getElementById('savings-title');
   const amountEl = document.getElementById('savings-amount');
   const subEl = document.getElementById('savings-sub');
 
-  // クラスを一旦すべてリセット
+  if (!cardEl) return;
+
   cardEl.classList.remove('period-year', 'period-month', 'period-balance');
 
-  // 4. モードに合わせて表示を切り替える
   if (savingsPeriod === 'year') {
     cardEl.classList.add('period-year');
     titleEl.textContent = '今年浮いた外食費（累計）';
@@ -200,9 +222,8 @@ function renderSavingsCard() {
   }
 }
 
-// 期間の切替（今年 ➔ 今月 ➔ 残高 ➔ 今年...）
 function toggleSavingsPeriod(e) {
-  e.stopPropagation(); // モーダルが開くのを防止
+  e.stopPropagation();
   if (savingsPeriod === 'year') {
     savingsPeriod = 'month';
   } else if (savingsPeriod === 'month') {
@@ -213,14 +234,11 @@ function toggleSavingsPeriod(e) {
   renderSavingsCard();
 }
 
-// 累計カードをクリックしたら履歴モーダルを開く
 function handleSavingsCardClick(e) {
-  // 残高モードのときは履歴を開かない
   if (savingsPeriod === 'balance') return;
   openHistoryModal();
 }
 
-// ★使った履歴モーダルの描画と開閉
 function openHistoryModal() {
   const listEl = document.getElementById('history-list');
   listEl.innerHTML = '';
@@ -244,7 +262,6 @@ function openHistoryModal() {
       listEl.appendChild(row);
     });
   }
-
   document.getElementById('history-modal-overlay').classList.add('is-open');
 }
 
@@ -255,9 +272,8 @@ function closeHistoryModalOnBackdrop(e) {
   if (e.target.id === 'history-modal-overlay') closeHistoryModal();
 }
 
-// ★ポイント利用モーダルの開閉と実行
 function openUseModal(id) {
-  const coupon = coupons.find(c => c.id === id);
+  const coupon = coupons.find(c => c.id == id);
   if (!coupon) return;
   currentUsingCoupon = coupon;
 
@@ -297,7 +313,6 @@ async function confirmUseAmount() {
   closeUseModal();
 }
 
-// カレンダー描画
 function renderCalendar() {
   const grid = document.getElementById('calendar-grid');
   const label = document.getElementById('month-label');
@@ -343,7 +358,6 @@ function renderCalendar() {
   }
 }
 
-// 優待リスト描画
 function renderList(filterDate = null) {
   const list = document.getElementById('yutai-list');
   const title = document.getElementById('list-title');
@@ -367,7 +381,7 @@ function renderList(filterDate = null) {
     let badgeClass = diffDays <= 7 ? 'expire-soon' : (diffDays <= 30 ? 'expire-warn' : 'expire-normal');
     let badgeText = diffDays < 0 ? '期限切れ' : `あと${diffDays}日`;
 
-    const isEditing = (editingCouponId === item.id);
+    const isEditing = (editingCouponId == item.id);
     const card = document.createElement('div');
     card.className = `yutai-card ${filterDate ? 'highlight' : ''}`;
 
@@ -420,15 +434,10 @@ function renderList(filterDate = null) {
       }
     }
   });
-// 未使用の総残高を計算して表示する
-  const totalBalance = coupons.reduce((sum, item) => sum + Number(item.amount), 0);
-  const displayEl = document.getElementById('total-balance-display');
-  if (displayEl) {
-    displayEl.textContent = `未使用の総残高: ¥${totalBalance.toLocaleString()}`;
-  }
+  
+  renderSavingsCard();
 }
 
-// 残高上書きの開始と保存
 function startEditing(id) {
   editingCouponId = id;
   renderList(selectedDateStr);
@@ -439,22 +448,18 @@ async function saveDirectBalance(id) {
   if (!inputEl) return;
   const newAmount = parseInt(inputEl.value, 10);
   if (!isNaN(newAmount) && newAmount >= 0) await updateAmountInDB(id, newAmount);
-  editingCouponId = null;
 }
 
-// 絞り込みリセット
 function resetFilter() {
   selectedDateStr = null;
   renderCalendar();
   renderList();
 }
 
-// 新規モーダルの開閉
 function openModal() { document.getElementById('modal-overlay').classList.add('is-open'); }
 function closeModal() { document.getElementById('modal-overlay').classList.remove('is-open'); }
 function closeModalOnBackdrop(e) { if (e.target.id === 'modal-overlay') closeModal(); }
 
-// カレンダーの月移動
 document.getElementById('prev-month').onclick = () => {
   currentMonth--;
   if (currentMonth < 0) { currentMonth = 11; currentYear--; }
@@ -469,4 +474,3 @@ document.getElementById('next-month').onclick = () => {
 // 初期読み込み
 fetchCoupons();
 fetchLogs();
-setupRealtime();
