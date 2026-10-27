@@ -474,3 +474,21 @@ document.getElementById('next-month').onclick = () => {
 // 初期読み込み
 fetchCoupons();
 fetchLogs();
+
+// ★手動で最新データを再取得する（更新ボタン用）
+async function reloadData() {
+  const btn = document.getElementById('reload-btn');
+  if (btn) {
+    btn.innerHTML = '⏳ 更新中...';
+    btn.disabled = true; // 連打防止
+  }
+  
+  // スプレッドシートから最新データを読み込み直す
+  await fetchCoupons();
+  await fetchLogs();
+  
+  if (btn) {
+    btn.innerHTML = '🔄 更新';
+    btn.disabled = false;
+  }
+}
