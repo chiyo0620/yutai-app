@@ -10,20 +10,20 @@
   <link rel="icon" type="image/png" href="icon.png">
   <!-- ホーム画面追加時のアプリ名を指定 -->
   <meta name="apple-mobile-web-app-title" content="優待ノート">
-  <!-- Supabase JS Client (CDN) -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- 外部CSSの読み込み -->
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
   <div class="app-container">
-    <header>
-      <div class="header-top">
-        <h1>🍽️ 外食優待ノート</h1>
-      </div>
-    </header>
-
+<header>
+  <!-- ★修正：タイトル横に更新ボタンを配置 -->
+  <div class="header-top" style="display: flex; justify-content: space-between; align-items: center;">
+    <h1>🍽️ 外食優待ノート</h1>
+    <button id="reload-btn" onclick="reloadData()" style="background: #ffffff; border: 1px solid #edf2f7; font-size: 0.9rem; cursor: pointer; padding: 6px 10px; border-radius: 8px; color: #4a5568; font-weight: bold; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">🔄 更新</button>
+  </div>
+</header>
+    
 <!-- ★修正後：浮いた外食費カード -->
     <section class="savings-card" onclick="handleSavingsCardClick(event)">
       <div class="savings-left">
