@@ -8,10 +8,9 @@ let editingCouponId = null;
 let currentYear = new Date().getFullYear();
 let currentMonth = new Date().getMonth();
 let selectedDateStr = null;
-let savingsPeriod = 'balance'; // 初期表示モード
+let savingsPeriod = 'balance';
 let currentUsingCoupon = null;
 
-// 日付のズレを防ぐための変換関数
 function formatDate(dateStr) {
   if (!dateStr) return '';
   if (typeof dateStr === 'string' && dateStr.length === 10) return dateStr;
@@ -23,7 +22,6 @@ function formatDate(dateStr) {
   return `${year}-${month}-${day}`;
 }
 
-// 1. スプレッドシートから優待一覧を取得
 async function fetchCoupons() {
   try {
     const res = await fetch(GAS_URL + '?action=getCoupons');
@@ -44,7 +42,6 @@ async function fetchCoupons() {
   }
 }
 
-// 2. スプレッドシートから利用履歴を取得
 async function fetchLogs() {
   try {
     const res = await fetch(GAS_URL + '?action=getLogs');
@@ -60,9 +57,21 @@ async function fetchLogs() {
   }
 }
 
-// 残高の直接更新（手動修正用）
+async function reloadData() {
+  const btn = document.getElementById('reload-btn');
+  if (btn) {
+    btn.innerHTML = '⏳ 更新中...';
+    btn.disabled = true;
+  }
+  await fetchCoupons();
+  await fetchLogs();
+  if (btn) {
+    btn.innerHTML = '🔄 更新';
+    btn.disabled = false;
+  }
+}
+
 async function updateAmountInDB(id, newAmount) {
-  // ★楽観的UI：通信を待たずに画面だけ先に書き換えてサクサク感を作る
   const target = coupons.find(c => c.id == id);
   if (target) target.amount = newAmount;
   editingCouponId = null;
@@ -79,17 +88,34 @@ async function updateAmountInDB(id, newAmount) {
   }
 }
 
-// 優待を利用して履歴に記録する（共通処理）
+// ★追加：優待の削除機能
+async function deleteCoupon(id) {
+  if (!confirm('この優待を完全に削除しますか？\n（これまでの利用履歴は残ります）')) return;
+
+  // 画面から先に消す
+  coupons = coupons.filter(c => c.id != id);
+  renderList(selectedDateStr);
+  renderSavingsCard();
+
+  try {
+    await fetch(GAS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'deleteCoupon', id: id })
+    });
+  } catch (error) {
+    console.error('削除エラー:', error);
+    alert('削除に失敗しました');
+  }
+}
+
 async function applyCouponUsage(coupon, amountUsed) {
   if (amountUsed <= 0 || amountUsed > coupon.amount) {
     alert('残高の範囲内で金額を入力してください');
     return;
   }
-
   const nextAmount = coupon.amount - amountUsed;
   const todayStr = formatDate(new Date());
 
-  // ★楽観的UI：通信を待たずに画面だけ先に書き換える
   coupon.amount = nextAmount;
   couponLogs.unshift({
     coupon_id: coupon.id,
@@ -102,37 +128,13 @@ async function applyCouponUsage(coupon, amountUsed) {
   renderSavingsCard();
 
   try {
-    // スプレッドシートへ残高更新を依頼
-    await fetch(GAS_URL, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'updateAmount', id: coupon.id, amount: nextAmount })
-    });
-    // スプレッドシートへ履歴保存を依頼
-    await fetch(GAS_URL, {
-      method: 'POST',
-      body: JSON.stringify({
-        action: 'insertLog',
-        coupon_id: coupon.id,
-        coupon_name: coupon.name,
-        icon: coupon.icon,
-        amount_used: amountUsed,
-        used_date: todayStr
-      })
-    });
+    await fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'updateAmount', id: coupon.id, amount: nextAmount }) });
+    await fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'insertLog', coupon_id: coupon.id, coupon_name: coupon.name, icon: coupon.icon, amount_used: amountUsed, used_date: todayStr }) });
   } catch (error) {
     console.error('履歴保存エラー:', error);
   }
 }
 
-// 紙券の「−¥500」ボタン処理
-async function usePaperCoupon(id) {
-  const target = coupons.find(c => c.id == id);
-  if (target && target.amount >= target.unit) {
-    await applyCouponUsage(target, target.unit);
-  }
-}
-
-// 新規優待の保存
 async function saveNewCoupon() {
   const name = document.getElementById('m-name').value;
   const icon = document.getElementById('m-icon').value;
@@ -146,62 +148,43 @@ async function saveNewCoupon() {
     alert('銘柄名、金額、期限は必須です');
     return;
   }
-
   try {
     await fetch(GAS_URL, {
       method: 'POST',
-      body: JSON.stringify({
-        action: 'insertCoupon',
-        name: name,
-        icon: icon,
-        is_point: isPoint,
-        amount: amount,
-        unit: unit,
-        limit_date: limitDate,
-        holder: holder
-      })
+      body: JSON.stringify({ action: 'insertCoupon', name, icon, is_point: isPoint, amount, unit, limit_date: limitDate, holder })
     });
     closeModal();
-    // 登録後はデータを再取得して画面を更新
     await fetchCoupons();
   } catch (error) {
     alert('保存エラー: 通信に失敗しました');
   }
 }
 
-// ★浮いた外食費と総残高の集計・表示
 function renderSavingsCard() {
   const now = new Date();
   const currentYearNum = now.getFullYear();
   const currentMonthNum = now.getMonth() + 1;
+  let totalYear = 0, totalMonth = 0;
 
-  let totalYear = 0;
-  let totalMonth = 0;
   couponLogs.forEach(log => {
     if (!log.used_date) return;
     const parts = String(log.used_date).split('-');
     if (parts.length < 2) return;
-    
     const logYear = parseInt(parts[0], 10);
     const logMonth = parseInt(parts[1], 10);
-
     if (logYear === currentYearNum) {
       totalYear += log.amount_used;
-      if (logMonth === currentMonthNum) {
-        totalMonth += log.amount_used;
-      }
+      if (logMonth === currentMonthNum) totalMonth += log.amount_used;
     }
   });
 
   const totalBalance = coupons.reduce((sum, item) => sum + Number(item.amount), 0);
-
   const cardEl = document.querySelector('.savings-card');
   const titleEl = document.getElementById('savings-title');
   const amountEl = document.getElementById('savings-amount');
   const subEl = document.getElementById('savings-sub');
 
   if (!cardEl) return;
-
   cardEl.classList.remove('period-year', 'period-month', 'period-balance');
 
   if (savingsPeriod === 'year') {
@@ -224,13 +207,9 @@ function renderSavingsCard() {
 
 function toggleSavingsPeriod(e) {
   e.stopPropagation();
-  if (savingsPeriod === 'year') {
-    savingsPeriod = 'month';
-  } else if (savingsPeriod === 'month') {
-    savingsPeriod = 'balance';
-  } else {
-    savingsPeriod = 'year';
-  }
+  if (savingsPeriod === 'year') savingsPeriod = 'month';
+  else if (savingsPeriod === 'month') savingsPeriod = 'balance';
+  else savingsPeriod = 'year';
   renderSavingsCard();
 }
 
@@ -242,7 +221,6 @@ function handleSavingsCardClick(e) {
 function openHistoryModal() {
   const listEl = document.getElementById('history-list');
   listEl.innerHTML = '';
-
   if (couponLogs.length === 0) {
     listEl.innerHTML = '<div class="history-empty">まだ利用履歴がありません<br>優待を使うとここに記録されます 🍽️</div>';
   } else {
@@ -265,13 +243,10 @@ function openHistoryModal() {
   document.getElementById('history-modal-overlay').classList.add('is-open');
 }
 
-function closeHistoryModal() {
-  document.getElementById('history-modal-overlay').classList.remove('is-open');
-}
-function closeHistoryModalOnBackdrop(e) {
-  if (e.target.id === 'history-modal-overlay') closeHistoryModal();
-}
+function closeHistoryModal() { document.getElementById('history-modal-overlay').classList.remove('is-open'); }
+function closeHistoryModalOnBackdrop(e) { if (e.target.id === 'history-modal-overlay') closeHistoryModal(); }
 
+// ★修正：使うモーダルをタイプに合わせて動的に切り替える
 function openUseModal(id) {
   const coupon = coupons.find(c => c.id == id);
   if (!coupon) return;
@@ -279,12 +254,23 @@ function openUseModal(id) {
 
   document.getElementById('use-modal-title').textContent = `${coupon.icon} ${coupon.name} を使う`;
   document.getElementById('use-current-balance').textContent = `現在の残高: ¥${coupon.amount.toLocaleString()}`;
-  document.getElementById('use-amount-input').value = '';
+  
+  const labelEl = document.getElementById('use-modal-label');
+  const inputEl = document.getElementById('use-amount-input');
+
+  // ポイントか紙券かで入力画面の文字を変える
+  if (coupon.is_point) {
+    labelEl.textContent = 'お会計で使った金額（円）';
+    inputEl.placeholder = '例: 1420';
+  } else {
+    labelEl.textContent = `使った枚数（1枚 = ${coupon.unit}円）`;
+    inputEl.placeholder = '例: 2';
+  }
+
+  inputEl.value = '';
   document.getElementById('use-modal-overlay').classList.add('is-open');
 
-  setTimeout(() => {
-    document.getElementById('use-amount-input').focus();
-  }, 200);
+  setTimeout(() => { document.getElementById('use-amount-input').focus(); }, 200);
 }
 
 function closeUseModal() {
@@ -295,17 +281,27 @@ function closeUseModalOnBackdrop(e) {
   if (e.target.id === 'use-modal-overlay') closeUseModal();
 }
 
+// ★修正：入力された枚数（または金額）から最終金額を計算する
 async function confirmUseAmount() {
   if (!currentUsingCoupon) return;
   const inputEl = document.getElementById('use-amount-input');
-  const amountToUse = parseInt(inputEl.value, 10);
+  const inputValue = parseInt(inputEl.value, 10);
 
-  if (isNaN(amountToUse) || amountToUse <= 0) {
-    alert('有効な金額を入力してください');
+  if (isNaN(inputValue) || inputValue <= 0) {
+    alert('有効な数字を入力してください');
     return;
   }
+
+  // 金額を計算（紙券なら 枚数×単価）
+  let amountToUse = 0;
+  if (currentUsingCoupon.is_point) {
+    amountToUse = inputValue;
+  } else {
+    amountToUse = inputValue * currentUsingCoupon.unit;
+  }
+
   if (amountToUse > currentUsingCoupon.amount) {
-    alert(`残高（¥${currentUsingCoupon.amount.toLocaleString()}）を超える金額は使えません`);
+    alert(`残高（¥${currentUsingCoupon.amount.toLocaleString()}）を超える利用はできません`);
     return;
   }
 
@@ -332,7 +328,7 @@ function renderCalendar() {
     const cell = document.createElement('div');
     cell.className = 'calendar-cell';
     const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const matching = coupons.filter(c => c.limit_date === dateStr);
+    const matching = coupons.filter(c => c.limit_date === dateStr && c.amount > 0);
     cell.innerHTML = `<span>${day}</span>`;
 
     if (matching.length > 0) {
@@ -358,6 +354,7 @@ function renderCalendar() {
   }
 }
 
+// ★修正：UIの描画処理（削除ボタンの追加と、使うボタンの共通化）
 function renderList(filterDate = null) {
   const list = document.getElementById('yutai-list');
   const title = document.getElementById('list-title');
@@ -387,6 +384,19 @@ function renderList(filterDate = null) {
 
     const subLabel = item.is_point ? `<small>(1円単位pt)</small>` : `<small>(${item.unit}円券 × ${Math.floor(item.amount / item.unit)}枚)</small>`;
 
+    // ボタンの振り分け（残高0円なら削除ボタン、それ以外は通常）
+    let actionButtonsHtml = '';
+    if (item.amount === 0) {
+      actionButtonsHtml = `
+        <button class="use-btn" onclick="deleteCoupon(${item.id})" style="background: #fff5f5; color: #e53e3e; border-color: #feb2b2; width: 100%;">🗑️ 使い切ったので削除</button>
+      `;
+    } else {
+      actionButtonsHtml = `
+        <button class="use-btn primary" onclick="openUseModal(${item.id})">使う</button>
+        <button class="use-btn" onclick="startEditing(${item.id})">残高上書き</button>
+      `;
+    }
+
     card.innerHTML = `
       <div class="card-top">
         <div class="brand-info">
@@ -400,6 +410,7 @@ function renderList(filterDate = null) {
           <div class="edit-inline-form">
             ¥<input type="number" class="edit-input" id="input-${item.id}" value="${item.amount}" inputmode="numeric" />
             <button class="edit-save-btn" onclick="saveDirectBalance(${item.id})">保存</button>
+            <button class="edit-save-btn" onclick="deleteCoupon(${item.id})" style="background: #e53e3e;">削除</button>
           </div>
         ` : `
           <div class="balance-wrapper" onclick="startEditing(${item.id})">
@@ -412,12 +423,7 @@ function renderList(filterDate = null) {
       <div class="card-bottom">
         <span class="expire-date-text">期限: ${item.limit_date}</span>
         <div class="action-btns">
-          ${item.is_point ? `
-            <button class="use-btn primary" onclick="openUseModal(${item.id})">使った</button>
-          ` : `
-            <button class="use-btn" onclick="usePaperCoupon(${item.id})">−¥${item.unit}</button>
-          `}
-          <button class="use-btn" onclick="startEditing(${item.id})">残高上書き</button>
+          ${actionButtonsHtml}
         </div>
       </div>
     `;
@@ -434,7 +440,6 @@ function renderList(filterDate = null) {
       }
     }
   });
-  
   renderSavingsCard();
 }
 
@@ -471,24 +476,5 @@ document.getElementById('next-month').onclick = () => {
   renderCalendar();
 };
 
-// 初期読み込み
 fetchCoupons();
 fetchLogs();
-
-// ★手動で最新データを再取得する（更新ボタン用）
-async function reloadData() {
-  const btn = document.getElementById('reload-btn');
-  if (btn) {
-    btn.innerHTML = '⏳ 更新中...';
-    btn.disabled = true; // 連打防止
-  }
-  
-  // スプレッドシートから最新データを読み込み直す
-  await fetchCoupons();
-  await fetchLogs();
-  
-  if (btn) {
-    btn.innerHTML = '🔄 更新';
-    btn.disabled = false;
-  }
-}
