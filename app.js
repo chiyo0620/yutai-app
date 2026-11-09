@@ -423,6 +423,7 @@ function renderList(filterDate = null) {
 
     const subLabel = item.is_point ? `<small>(1円単位pt)</small>` : `<small>(${item.unit}円券 × ${Math.floor(item.amount / item.unit)}枚)</small>`;
 
+    // ボタンの振り分け（残高0円なら削除ボタン、それ以外は「使う」をメイン表示）
     let actionButtonsHtml = '';
     if (item.amount === 0) {
       actionButtonsHtml = `
@@ -430,8 +431,8 @@ function renderList(filterDate = null) {
       `;
     } else {
       actionButtonsHtml = `
-        <button class="use-btn primary" onclick="openUseModal(${item.id})">使う</button>
-        <button class="use-btn" onclick="startEditing(${item.id})">残高上書き</button>
+        <button class="use-btn primary" style="flex: 1;" onclick="openUseModal(${item.id})">使う</button>
+        <button onclick="startEditing(${item.id})" style="background: none; border: none; color: #a0aec0; font-size: 0.75rem; padding: 4px 6px; text-decoration: underline; cursor: pointer; white-space: nowrap;">残高修正</button>
       `;
     }
 
