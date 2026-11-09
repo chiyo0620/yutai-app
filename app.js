@@ -40,6 +40,7 @@ async function fetchCoupons() {
   }
 }
 
+// 2. スプレッドシートから利用履歴を取得（新しい順に並び替え）
 async function fetchLogs() {
   try {
     const res = await fetch(GAS_URL + '?action=getLogs');
@@ -49,7 +50,8 @@ async function fetchLogs() {
       log.used_date = formatDate(log.used_date);
       log.amount_used = Number(log.amount_used) || 0;
       return log;
-    });
+    }).reverse(); // ★追加：取得した履歴を反転して「新しい順」にする
+    
     renderSavingsCard();
   } catch (err) {
     console.error('通信エラー:', err);
