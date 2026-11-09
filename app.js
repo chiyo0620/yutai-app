@@ -45,6 +45,7 @@ async function fetchLogs() {
     const res = await fetch(GAS_URL + '?action=getLogs');
     const data = await res.json();
     couponLogs = data.map(log => {
+      log.id = log.id; // IDを保持
       log.used_date = formatDate(log.used_date);
       log.amount_used = Number(log.amount_used) || 0;
       return log;
@@ -52,6 +53,25 @@ async function fetchLogs() {
     renderSavingsCard();
   } catch (err) {
     console.error('通信エラー:', err);
+  }
+}
+
+async function deleteLog(logId) {
+  if (!confirm('この利用履歴を削除しますか？\n（浮いた外食費の集計から除外されます）')) return;
+
+  // 画面から先に消す
+  couponLogs = couponLogs.filter(l => l.id != logId);
+  openHistoryModal();
+  renderSavingsCard();
+
+  try {
+    await fetch(GAS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'deleteLog', id: logId })
+    });
+  } catch (error) {
+    console.error('履歴削除エラー:', error);
+    alert('履歴の削除に失敗しました');
   }
 }
 
@@ -236,15 +256,19 @@ function openHistoryModal() {
     couponLogs.forEach(item => {
       const row = document.createElement('div');
       row.className = 'history-item';
+      row.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #edf2f7;';
       row.innerHTML = `
-        <div class="history-item-left">
+        <div class="history-item-left" style="display: flex; align-items: center; gap: 10px;">
           <span style="font-size:1.3rem;">${item.icon || '🍽️'}</span>
           <div>
             <strong>${item.coupon_name}</strong>
-            <div class="history-date">${item.used_date}</div>
+            <div class="history-date" style="font-size: 0.8rem; color: #718096;">${item.used_date}</div>
           </div>
         </div>
-        <div class="history-amount">−¥${item.amount_used.toLocaleString()}</div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div class="history-amount" style="font-weight: bold; color: #e53e3e;">−¥${item.amount_used.toLocaleString()}</div>
+          <button onclick="deleteLog(${item.id})" style="background: none; border: none; cursor: pointer; font-size: 1rem; padding: 4px;" title="履歴を削除">🗑️</button>
+        </div>
       `;
       listEl.appendChild(row);
     });
