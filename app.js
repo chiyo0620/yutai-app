@@ -2,7 +2,6 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbwBQemPSreyB3VoDLcNBYil
 
 let coupons = [];
 let couponLogs = [];
-let editingCouponId = null;
 let currentYear = new Date().getFullYear();
 let currentMonth = new Date().getMonth();
 let selectedDateStr = null;
@@ -40,17 +39,16 @@ async function fetchCoupons() {
   }
 }
 
-// 2. スプレッドシートから利用履歴を取得（新しい順に並び替え）
 async function fetchLogs() {
   try {
     const res = await fetch(GAS_URL + '?action=getLogs');
     const data = await res.json();
     couponLogs = data.map(log => {
-      log.id = log.id; // IDを保持
+      log.id = log.id;
       log.used_date = formatDate(log.used_date);
       log.amount_used = Number(log.amount_used) || 0;
       return log;
-    }).reverse(); // ★追加：取得した履歴を反転して「新しい順」にする
+    }).reverse(); // 新しい順に並び替え
     
     renderSavingsCard();
   } catch (err) {
@@ -61,7 +59,6 @@ async function fetchLogs() {
 async function deleteLog(logId) {
   if (!confirm('この利用履歴を削除しますか？\n（浮いた外食費の集計から除外されます）')) return;
 
-  // 画面から先に消す
   couponLogs = couponLogs.filter(l => l.id != logId);
   openHistoryModal();
   renderSavingsCard();
@@ -94,7 +91,6 @@ async function reloadData() {
 async function updateAmountInDB(id, newAmount) {
   const target = coupons.find(c => c.id == id);
   if (target) target.amount = newAmount;
-  editingCouponId = null;
   renderList(selectedDateStr);
   renderSavingsCard();
 
@@ -153,7 +149,6 @@ async function applyCouponUsage(coupon, amountUsed) {
   }
 }
 
-// ★連打防止を加えた新規登録
 async function saveNewCoupon() {
   const submitBtn = document.querySelector('#modal-overlay .submit-btn');
   const name = document.getElementById('m-name').value;
@@ -314,7 +309,6 @@ function closeUseModalOnBackdrop(e) {
   if (e.target.id === 'use-modal-overlay') closeUseModal();
 }
 
-// ★連打防止を加えた利用確定処理
 async function confirmUseAmount() {
   if (!currentUsingCoupon) return;
   const inputEl = document.getElementById('use-amount-input');
@@ -417,13 +411,10 @@ function renderList(filterDate = null) {
     let badgeClass = diffDays <= 7 ? 'expire-soon' : (diffDays <= 30 ? 'expire-warn' : 'expire-normal');
     let badgeText = diffDays < 0 ? '期限切れ' : `あと${diffDays}日`;
 
-    const isEditing = (editingCouponId == item.id);
     const card = document.createElement('div');
     card.className = `yutai-card ${filterDate ? 'highlight' : ''}`;
-
     const subLabel = item.is_point ? `<small>(1円単位pt)</small>` : `<small>(${item.unit}円券 × ${Math.floor(item.amount / item.unit)}枚)</small>`;
 
-    // ボタンの振り分け（残高0円なら削除ボタン、それ以外は「使う」をメイン表示）
     let actionButtonsHtml = '';
     if (item.amount === 0) {
       actionButtonsHtml = `
@@ -445,18 +436,10 @@ function renderList(filterDate = null) {
         <span class="wallet-badge badge-${item.holder}">${item.holder}</span>
       </div>
       <div class="card-mid">
-        ${isEditing ? `
-          <div class="edit-inline-form">
-            ¥<input type="number" class="edit-input" id="input-${item.id}" value="${item.amount}" inputmode="numeric" />
-            <button class="edit-save-btn" onclick="saveDirectBalance(${item.id})">保存</button>
-            <button class="edit-save-btn" onclick="deleteCoupon(${item.id})" style="background: #e53e3e;">削除</button>
-          </div>
-        ` : `
-          <div class="balance-wrapper" onclick="startEditing(${item.id})">
-            <div class="balance-info">¥${item.amount.toLocaleString()}<span class="edit-hint">✎</span></div>
-            ${subLabel}
-          </div>
-        `}
+        <div class="balance-wrapper" onclick="startEditing(${item.id})">
+          <div class="balance-info">¥${item.amount.toLocaleString()}<span class="edit-hint">✎</span></div>
+          ${subLabel}
+        </div>
         <span class="expire-badge ${badgeClass}">${badgeText}</span>
       </div>
       <div class="card-bottom">
@@ -467,31 +450,26 @@ function renderList(filterDate = null) {
       </div>
     `;
     list.appendChild(card);
-
-    if (isEditing) {
-      const inputEl = document.getElementById(`input-${item.id}`);
-      if (inputEl) {
-        inputEl.focus();
-        inputEl.select();
-        inputEl.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') saveDirectBalance(item.id);
-        });
-      }
-    }
   });
   renderSavingsCard();
 }
 
-function startEditing(id) {
-  editingCouponId = id;
-  renderList(selectedDateStr);
-}
+// ★修正：スマホ標準のポップアップ入力でズレを防止
+async function startEditing(id) {
+  const item = coupons.find(c => c.id == id);
+  if (!item) return;
 
-async function saveDirectBalance(id) {
-  const inputEl = document.getElementById(`input-${id}`);
-  if (!inputEl) return;
-  const newAmount = parseInt(inputEl.value, 10);
-  if (!isNaN(newAmount) && newAmount >= 0) await updateAmountInDB(id, newAmount);
+  const input = prompt(`【${item.name}】\n正しい残高を入力してください`, item.amount);
+  
+  // キャンセルが押された場合は何もしない
+  if (input === null) return;
+
+  const newAmount = parseInt(input, 10);
+  if (!isNaN(newAmount) && newAmount >= 0) {
+    await updateAmountInDB(id, newAmount);
+  } else {
+    alert('有効な数字（0以上）を入力してください');
+  }
 }
 
 function resetFilter() {
