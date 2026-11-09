@@ -1,7 +1,5 @@
-// 新しい受付スタッフ（GAS）のURL
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbwBQemPSreyB3VoDLcNBYilt4VB-_7GSf5RmVfk-wVYWU-uQhR9wk8pjbXalCpH1QAy/exec';
 
-// 状態管理
 let coupons = [];
 let couponLogs = [];
 let editingCouponId = null;
@@ -88,11 +86,9 @@ async function updateAmountInDB(id, newAmount) {
   }
 }
 
-// ★追加：優待の削除機能
 async function deleteCoupon(id) {
   if (!confirm('この優待を完全に削除しますか？\n（これまでの利用履歴は残ります）')) return;
 
-  // 画面から先に消す
   coupons = coupons.filter(c => c.id != id);
   renderList(selectedDateStr);
   renderSavingsCard();
@@ -135,7 +131,9 @@ async function applyCouponUsage(coupon, amountUsed) {
   }
 }
 
+// ★連打防止を加えた新規登録
 async function saveNewCoupon() {
+  const submitBtn = document.querySelector('#modal-overlay .submit-btn');
   const name = document.getElementById('m-name').value;
   const icon = document.getElementById('m-icon').value;
   const isPoint = document.getElementById('m-is-point').value === 'true';
@@ -148,6 +146,12 @@ async function saveNewCoupon() {
     alert('銘柄名、金額、期限は必須です');
     return;
   }
+
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = '保存中...';
+  }
+
   try {
     await fetch(GAS_URL, {
       method: 'POST',
@@ -157,6 +161,11 @@ async function saveNewCoupon() {
     await fetchCoupons();
   } catch (error) {
     alert('保存エラー: 通信に失敗しました');
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '保存する';
+    }
   }
 }
 
@@ -246,7 +255,6 @@ function openHistoryModal() {
 function closeHistoryModal() { document.getElementById('history-modal-overlay').classList.remove('is-open'); }
 function closeHistoryModalOnBackdrop(e) { if (e.target.id === 'history-modal-overlay') closeHistoryModal(); }
 
-// ★修正：使うモーダルをタイプに合わせて動的に切り替える
 function openUseModal(id) {
   const coupon = coupons.find(c => c.id == id);
   if (!coupon) return;
@@ -258,7 +266,6 @@ function openUseModal(id) {
   const labelEl = document.getElementById('use-modal-label');
   const inputEl = document.getElementById('use-amount-input');
 
-  // ポイントか紙券かで入力画面の文字を変える
   if (coupon.is_point) {
     labelEl.textContent = 'お会計で使った金額（円）';
     inputEl.placeholder = '例: 1420';
@@ -281,10 +288,11 @@ function closeUseModalOnBackdrop(e) {
   if (e.target.id === 'use-modal-overlay') closeUseModal();
 }
 
-// ★修正：入力された枚数（または金額）から最終金額を計算する
+// ★連打防止を加えた利用確定処理
 async function confirmUseAmount() {
   if (!currentUsingCoupon) return;
   const inputEl = document.getElementById('use-amount-input');
+  const submitBtn = document.querySelector('#use-modal-overlay .submit-btn');
   const inputValue = parseInt(inputEl.value, 10);
 
   if (isNaN(inputValue) || inputValue <= 0) {
@@ -292,21 +300,27 @@ async function confirmUseAmount() {
     return;
   }
 
-  // 金額を計算（紙券なら 枚数×単価）
-  let amountToUse = 0;
-  if (currentUsingCoupon.is_point) {
-    amountToUse = inputValue;
-  } else {
-    amountToUse = inputValue * currentUsingCoupon.unit;
-  }
+  let amountToUse = currentUsingCoupon.is_point ? inputValue : (inputValue * currentUsingCoupon.unit);
 
   if (amountToUse > currentUsingCoupon.amount) {
     alert(`残高（¥${currentUsingCoupon.amount.toLocaleString()}）を超える利用はできません`);
     return;
   }
 
-  await applyCouponUsage(currentUsingCoupon, amountToUse);
-  closeUseModal();
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = '記録中...';
+  }
+
+  try {
+    await applyCouponUsage(currentUsingCoupon, amountToUse);
+    closeUseModal();
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '利用を記録する';
+    }
+  }
 }
 
 function renderCalendar() {
@@ -354,7 +368,6 @@ function renderCalendar() {
   }
 }
 
-// ★修正：UIの描画処理（削除ボタンの追加と、使うボタンの共通化）
 function renderList(filterDate = null) {
   const list = document.getElementById('yutai-list');
   const title = document.getElementById('list-title');
@@ -384,7 +397,6 @@ function renderList(filterDate = null) {
 
     const subLabel = item.is_point ? `<small>(1円単位pt)</small>` : `<small>(${item.unit}円券 × ${Math.floor(item.amount / item.unit)}枚)</small>`;
 
-    // ボタンの振り分け（残高0円なら削除ボタン、それ以外は通常）
     let actionButtonsHtml = '';
     if (item.amount === 0) {
       actionButtonsHtml = `
